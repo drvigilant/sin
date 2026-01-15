@@ -1,0 +1,16 @@
+
+# Build & Dist
+src/*.egg-info/
+build/
+dist/
+eggs/
+
+# Runtime Data
+data/*
+logs/*
+!data/.gitkeep
+!logs/.gitkeep
+__pycache__/
+*.py[cod]
+__pycache__/
+*.py[cod]
