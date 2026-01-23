@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # The Brain: PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: sin_db
+    environment:
+      POSTGRES_USER: sin_user
+      POSTGRES_PASSWORD: secure_dev_password
+      POSTGRES_DB: sin_network_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sin_user -d sin_network_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Admin Interface: PGAdmin (Optional, good for debugging)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: sin_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sin.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
