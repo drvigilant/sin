@@ -6,3 +6,6 @@ pydantic==2.5.2
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
+# API Layer
+fastapi==0.109.0
+uvicorn==0.27.0
