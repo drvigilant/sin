@@ -3,9 +3,10 @@ import pandas as pd
 import requests
 import plotly.express as px
 import time
+import os
 
 # Configuration
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("SIN_API_URL", "http://localhost:8000")
 st.set_page_config(
     page_title="SIN Enterprise Dashboard",
     page_icon="🛡️",

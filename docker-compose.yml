@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # The Brain: PostgreSQL Database
+  # 1. The Brain (Database)
   db:
     image: postgres:15-alpine
     container_name: sin_db
@@ -20,17 +20,36 @@ services:
       timeout: 5s
       retries: 5
 
-  # Admin Interface: PGAdmin (Optional, good for debugging)
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: sin_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@sin.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+  # 2. The Voice (API)
+  api:
+    build: .
+    container_name: sin_api
+    command: uvicorn sin.api.server:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app  # Live code reloading
     ports:
-      - "5050:80"
+      - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    environment:
+      # Tell SQLAlchemy to look for the container named 'db', not 'localhost'
+      SIN_DB_HOST: db
+
+  # 3. The Face (Dashboard)
+  dashboard:
+    build: .
+    container_name: sin_dashboard
+    command: streamlit run src/sin/ui/dashboard.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - .:/app  # Live code reloading
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    environment:
+      # Tell Streamlit where the API is
+      SIN_API_URL: http://api:8000
 
 volumes:
   postgres_data:
