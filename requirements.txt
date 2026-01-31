@@ -9,3 +9,8 @@ alembic==1.13.1
 # API Layer
 fastapi==0.109.0
 uvicorn==0.27.0
+# UI Layer
+streamlit==1.31.0
+pandas==2.2.0
+requests==2.31.0
+plotly==5.18.0

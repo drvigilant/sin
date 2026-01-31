@@ -1,3 +1,5 @@
+# ... (previous imports remain)
+# Ensure JSON is imported from sqlalchemy
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -21,12 +23,14 @@ class DeviceLog(Base):
     ip_address = Column(String, index=True)
     hostname = Column(String, nullable=True)
     status = Column(String)
-    
-    # NEW: Fingerprinting details
-    vendor = Column(String, nullable=True)      # e.g., "Hikvision", "Apple"
-    os_family = Column(String, nullable=True)   # e.g., "Linux", "Windows"
+    vendor = Column(String, nullable=True)
+    os_family = Column(String, nullable=True)
     
     open_ports = Column(JSON)
     protocols = Column(JSON)
+    
+    # NEW: Store list of found risks
+    # Example: [{"severity": "HIGH", "type": "Weak Creds", "description": "Default admin/admin detected"}]
+    vulnerabilities = Column(JSON, default=[]) 
     
     scan = relationship("ScanSession", back_populates="devices")
