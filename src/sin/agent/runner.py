@@ -1,4 +1,3 @@
-# ... existing imports ...
 import json
 import os
 import uuid
@@ -8,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from sin.discovery.network import NetworkDiscovery
 from sin.scanner.fingerprint import DeviceFingerprinter 
-# NEW IMPORT
 from sin.scanner.audit import VulnerabilityAuditor
+from sin.response.alert import DiscordAlerter
 from sin.utils.logger import get_logger
 from sin.storage.database import SessionLocal
 from sin.storage import models
@@ -20,27 +19,27 @@ class AgentRunner:
     def __init__(self):
         self.discovery_module = NetworkDiscovery()
         self.fingerprint_module = DeviceFingerprinter()
-        # NEW MODULE
         self.audit_module = VulnerabilityAuditor()
+        self.alerter = DiscordAlerter()
         self.session_uuid = str(uuid.uuid4())
 
     def run_assessment(self, subnet: str, output_dir: str = "data") -> None:
         logger.info(f"Starting assessment session: {self.session_uuid}")
         start_time = datetime.utcnow()
         
-        # 1. Discovery
+        # Phase 1: Discovery
         raw_assets = self.discovery_module.execute_subnet_scan(subnet)
         
         enriched_assets = []
         for asset in raw_assets:
-            # 2. Fingerprinting
+            # Phase 2: Fingerprinting
             analysis = self.fingerprint_module.analyze_asset(
                 asset['ip_address'], 
                 asset['open_ports']
             )
             asset.update(analysis)
             
-            # 3. Vulnerability Auditing (The Sword)
+            # Phase 3: Vulnerability Auditing
             vulns = self.audit_module.audit_device(
                 asset['ip_address'],
                 asset['open_ports']
@@ -48,7 +47,8 @@ class AgentRunner:
             asset['vulnerabilities'] = vulns
             
             if vulns:
-                logger.warning(f"⚠️ Vulnerabilities found on {asset['ip_address']}: {len(vulns)}")
+                logger.warning(f"⚠️ Vulnerabilities found on {asset['ip_address']}")
+                self.alerter.send_critical_alert(asset['ip_address'], vulns)
             
             enriched_assets.append(asset)
 
@@ -77,21 +77,18 @@ class AgentRunner:
                     protocols=asset['protocol_hints'],
                     os_family=asset.get('os_family'),
                     vendor=asset.get('vendor'),
-                    # NEW: Save Vulns
                     vulnerabilities=asset.get('vulnerabilities', [])
                 )
                 db.add(device)
             
             db.commit()
-            logger.info(f"✅ Saved {len(assets)} devices (with vulnerability data) to Database.")
+            logger.info(f"✅ Saved {len(assets)} devices to Database.")
             
         except Exception as e:
             logger.error(f"❌ Database save failed: {e}")
             db.rollback()
         finally:
             db.close()
-    
-    # ... (Keep _persist_json as is or remove if not needed) ...
+
     def _persist_json(self, data: Dict, directory: str) -> None:
-        # (Same code as before)
         pass

@@ -20,35 +20,60 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. The Voice (API)
+  # 2. The Broker (Redis - NEW)
+  redis:
+    image: redis:7-alpine
+    container_name: sin_redis
+    ports:
+      - "6379:6379"
+
+  # 3. The Voice (API)
   api:
     build: .
     container_name: sin_api
     command: uvicorn sin.api.server:app --host 0.0.0.0 --port 8000
     volumes:
-      - .:/app  # Live code reloading
+      - .:/app
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
-      # Tell SQLAlchemy to look for the container named 'db', not 'localhost'
       SIN_DB_HOST: db
+      SIN_REDIS_HOST: redis
+      DISCORD_WEBHOOK_URL: https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z 
 
-  # 3. The Face (Dashboard)
+  # 4. The Muscle (Worker - NEW)
+  worker:
+    build: .
+    container_name: sin_worker
+    # This command starts the Celery worker
+    command: celery -A sin.tasks.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      SIN_DB_HOST: db
+      SIN_REDIS_HOST: redis
+      DISCORD_WEBHOOK_URL: https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z
+
+  # 5. The Face (Dashboard)
   dashboard:
     build: .
     container_name: sin_dashboard
     command: streamlit run src/sin/ui/dashboard.py --server.port 8501 --server.address 0.0.0.0
     volumes:
-      - .:/app  # Live code reloading
+      - .:/app
     ports:
       - "8501:8501"
     depends_on:
       - api
     environment:
-      # Tell Streamlit where the API is
       SIN_API_URL: http://api:8000
 
 volumes:

@@ -14,3 +14,6 @@ streamlit==1.31.0
 pandas==2.2.0
 requests==2.31.0
 plotly==5.18.0
+# Automation & Alerting
+celery==5.3.6
+redis==5.0.1
