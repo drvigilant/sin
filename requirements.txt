@@ -17,3 +17,5 @@ plotly==5.18.0
 # Automation & Alerting
 celery==5.3.6
 redis==5.0.1
+# PDF
+fpdf2==2.7.7

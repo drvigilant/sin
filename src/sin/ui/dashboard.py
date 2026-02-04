@@ -4,6 +4,8 @@ import requests
 import plotly.express as px
 import time
 import os
+# NEW IMPORT
+from sin.response.report import generate_pdf_report
 
 # Configuration
 API_URL = os.getenv("SIN_API_URL", "http://localhost:8000")
@@ -39,6 +41,34 @@ st.sidebar.header("Control Center")
 if st.sidebar.button("🔄 Refresh Data"):
     st.rerun()
 
+# NEW: REPORT GENERATION BUTTON
+st.sidebar.markdown("---")
+st.sidebar.subheader("Audit Reports")
+if st.sidebar.button("📄 Generate PDF Report"):
+    with st.spinner("Generating Security Audit..."):
+        # 1. Fetch latest data
+        df = fetch_devices()
+        if not df.empty:
+            # 2. Convert DataFrame to list of dicts for the report generator
+            devices_list = df.to_dict('records')
+            
+            # 3. Generate PDF
+            pdf_path = generate_pdf_report(devices_list)
+            
+            # 4. Create Download Button
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_bytes = pdf_file.read()
+                
+            st.sidebar.download_button(
+                label="⬇️ Download Audit PDF",
+                data=pdf_bytes,
+                file_name="sin_security_audit.pdf",
+                mime="application/pdf"
+            )
+            st.sidebar.success("Report Generated!")
+        else:
+            st.sidebar.error("No data to report on.")
+
 st.sidebar.markdown("---")
 st.sidebar.info(f"**System Status**: 🟢 Online\n\n**API**: {API_URL}")
 
@@ -64,7 +94,6 @@ if not df.empty:
     
     with c1:
         st.subheader("📡 Device Vendor Distribution")
-        # Handle empty/null vendors
         df['vendor'] = df['vendor'].fillna('Unknown')
         fig_vendor = px.pie(df, names='vendor', hole=0.4)
         st.plotly_chart(fig_vendor, use_container_width=True)
@@ -78,7 +107,6 @@ if not df.empty:
     # Detailed Table
     st.subheader("🗂️ Live Asset Inventory")
     
-    # Formatting the table for better readability
     display_df = df[['ip_address', 'hostname', 'status', 'vendor', 'os_family', 'open_ports']]
     st.dataframe(
         display_df,
