@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. The Broker (Redis - NEW)
+  # 2. The Broker (Redis)
   redis:
     image: redis:7-alpine
     container_name: sin_redis
@@ -44,13 +44,13 @@ services:
     environment:
       SIN_DB_HOST: db
       SIN_REDIS_HOST: redis
-      DISCORD_WEBHOOK_URL: https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z 
+      # Make sure this is your actual Discord URL
+      DISCORD_WEBHOOK_URL: "https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z"
 
-  # 4. The Muscle (Worker - NEW)
+  # 4. The Muscle (Worker)
   worker:
     build: .
     container_name: sin_worker
-    # This command starts the Celery worker
     command: celery -A sin.tasks.celery_app worker --loglevel=info
     volumes:
       - .:/app
@@ -60,9 +60,23 @@ services:
     environment:
       SIN_DB_HOST: db
       SIN_REDIS_HOST: redis
-      DISCORD_WEBHOOK_URL: https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z
+      DISCORD_WEBHOOK_URL: "https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z"
 
-  # 5. The Face (Dashboard)
+  # 5. The Scheduler (Celery Beat - NEW)
+  beat:
+    build: .
+    container_name: sin_beat
+    command: celery -A sin.tasks.celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    environment:
+      SIN_DB_HOST: db
+      SIN_REDIS_HOST: redis
+
+  # 6. The Face (Dashboard)
   dashboard:
     build: .
     container_name: sin_dashboard
