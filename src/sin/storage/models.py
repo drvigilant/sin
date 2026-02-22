@@ -34,3 +34,16 @@ class DeviceLog(Base):
     vulnerabilities = Column(JSON, default=[]) 
     
     scan = relationship("ScanSession", back_populates="devices")
+
+class SecurityEvent(Base):
+    """
+    Stores historical anomalies, state changes, and heuristic alerts.
+    """
+    __tablename__ = "security_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String, index=True)
+    event_type = Column(String)  # e.g., 'PORT_OPENED', 'HEURISTIC_FLAG'
+    severity = Column(String)    # e.g., 'INFO', 'WARNING', 'CRITICAL'
+    description = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)

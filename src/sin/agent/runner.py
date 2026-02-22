@@ -47,6 +47,7 @@ class AgentRunner:
             )
             asset['vulnerabilities'] = vulns
 
+            # Standard vulnerability alerts
             if vulns:
                 logger.warning(f"⚠️ Vulnerabilities found on {asset['ip_address']}")
                 self.alerter.send_critical_alert(asset['ip_address'], vulns)
@@ -72,19 +73,40 @@ class AgentRunner:
             db.refresh(scan_session)
 
             for asset in assets:
-                # --- THE DIFF ENGINE LOGIC ---
+                # 1. THE DIFF ENGINE LOGIC
                 changes = analyzer.analyze_changes(asset)
                 
-                # If there are critical changes, scream to Discord!
-                critical_changes = [c for c in changes if c['severity'] in ['WARNING', 'CRITICAL']]
-                if critical_changes:
-                    logger.warning(f"⚠️ State changes detected on {asset['ip_address']}")
-                    self.alerter.send_critical_alert(
-                        asset['ip_address'], 
-                        critical_changes  
-                    )
-                # ------------------------------
+                # 2. THE HEURISTIC LOGIC (Hardcoded rules for IoT)
+                dangerous_ports = {21: "FTP", 23: "Telnet"}
+                for port in asset.get('open_ports', []):
+                    if port in dangerous_ports:
+                        changes.append({
+                            "type": "HEURISTIC_FLAG",
+                            "severity": "CRITICAL",
+                            "description": f"Insecure legacy protocol detected: {dangerous_ports[port]} (Port {port})."
+                        })
 
+                # 3. SAVE EVENTS TO DATABASE & DISCORD
+                critical_changes = []
+                for change in changes:
+                    # Save every event to the DB for the UI Timeline
+                    db_event = models.SecurityEvent(
+                        ip_address=asset['ip_address'],
+                        event_type=change['type'],
+                        severity=change['severity'],
+                        description=change['description']
+                    )
+                    db.add(db_event)
+                    
+                    # Group criticals for Discord
+                    if change['severity'] in ['WARNING', 'CRITICAL']:
+                        critical_changes.append(change)
+
+                if critical_changes:
+                    logger.warning(f"⚠️ Security events triggered on {asset['ip_address']}")
+                    self.alerter.send_critical_alert(asset['ip_address'], critical_changes)
+
+                # 4. SAVE THE DEVICE STATE (Existing logic)
                 device = models.DeviceLog(
                     scan_id=scan_session.id,
                     ip_address=asset['ip_address'],
