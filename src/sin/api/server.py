@@ -5,6 +5,8 @@ from typing import List
 from sin.storage.database import get_db
 from sin.storage import models
 from sin.api import schemas
+from sqlalchemy import desc
+from sin.storage.models import SecurityEvent
 
 app = FastAPI(
     title="SIN Enterprise API",
@@ -54,3 +56,27 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "total_scan_runs": total_scans,
         "latest_activity": datetime.utcnow()
     }
+
+@app.get("/events")
+def get_latest_events(limit: int = 50, db: Session = Depends(get_db)):
+    """
+    Fetches the most recent security events and anomalies for the timeline UI.
+    """
+    try:
+        # Query the database for the latest events, sorted by newest first
+        events = db.query(SecurityEvent).order_by(desc(SecurityEvent.timestamp)).limit(limit).all()
+        
+        # Format the data to send to the dashboard
+        return [
+            {
+                "id": e.id,
+                "ip_address": e.ip_address,
+                "event_type": e.event_type,
+                "severity": e.severity,
+                "description": e.description,
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None
+            }
+            for e in events
+        ]
+    except Exception as e:
+        return {"error": str(e)}
