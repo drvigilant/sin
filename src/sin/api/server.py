@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
+from sqlalchemy import desc, func
 
 from sin.storage.database import get_db
 from sin.storage import models
 from sin.api import schemas
-from sqlalchemy import desc
-from sin.storage.models import SecurityEvent
+from sin.storage.models import SecurityEvent, DeviceLog, ScanSession
 
 app = FastAPI(
     title="SIN Enterprise API",
@@ -32,30 +33,13 @@ def get_scan_history(db: Session = Depends(get_db)):
     Get history of all scan sessions.
     """
     scans = db.query(models.ScanSession).order_by(models.ScanSession.start_time.desc()).all()
-    
+
     # Enrich with device count
     results = []
     for s in scans:
         s.device_count = len(s.devices)
         results.append(s)
     return results
-
-@app.get("/dashboard/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
-    """
-    Aggregated statistics for the dashboard.
-    """
-    total_devices = db.query(models.DeviceLog).count()
-    total_scans = db.query(models.ScanSession).count()
-    
-    # Count unique vendors
-    vendors = db.query(models.DeviceLog.vendor, models.DeviceLog.os_family).all()
-    
-    return {
-        "total_assets_tracked": total_devices,
-        "total_scan_runs": total_scans,
-        "latest_activity": datetime.utcnow()
-    }
 
 @app.get("/events")
 def get_latest_events(limit: int = 50, db: Session = Depends(get_db)):
@@ -65,7 +49,7 @@ def get_latest_events(limit: int = 50, db: Session = Depends(get_db)):
     try:
         # Query the database for the latest events, sorted by newest first
         events = db.query(SecurityEvent).order_by(desc(SecurityEvent.timestamp)).limit(limit).all()
-        
+
         # Format the data to send to the dashboard
         return [
             {
@@ -78,5 +62,29 @@ def get_latest_events(limit: int = 50, db: Session = Depends(get_db)):
             }
             for e in events
         ]
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    """
+    Provides high-level metrics for the top of the dashboard.
+    """
+    try:
+        # Count unique IP addresses tracked
+        total_assets = db.query(func.count(func.distinct(DeviceLog.ip_address))).scalar() or 0
+
+        # Count total scan sessions run
+        total_scans = db.query(ScanSession).count()
+
+        # Get the timestamp of the most recent scan
+        latest_scan = db.query(ScanSession).order_by(desc(ScanSession.end_time)).first()
+        latest_time = latest_scan.end_time.isoformat() if latest_scan and latest_scan.end_time else "No scans yet"
+
+        return {
+            "total_assets_tracked": total_assets,
+            "total_scan_runs": total_scans,
+            "latest_activity": latest_time
+        }
     except Exception as e:
         return {"error": str(e)}
