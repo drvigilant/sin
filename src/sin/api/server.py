@@ -1,90 +1,46 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from datetime import datetime
-from sqlalchemy import desc, func
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from typing import Dict, Optional
 
-from sin.storage.database import get_db
-from sin.storage import models
-from sin.api import schemas
-from sin.storage.models import SecurityEvent, DeviceLog, ScanSession
+from sin.utils.logger import get_logger
+from sin.agent.runner import AgentRunner
 
-app = FastAPI(
-    title="SIN Enterprise API",
-    description="Shadows In The Network - Security Agent Interface",
-    version="0.1.0"
-)
+logger = get_logger("sin.api.server")
+app = FastAPI(title="SIN Enterprise API")
 
-@app.get("/")
-def health_check():
-    return {"status": "online", "system": "SIN Agent"}
+class ScanRequest(BaseModel):
+    subnet: Optional[str] = None
 
-@app.get("/devices", response_model=List[schemas.DeviceResponse])
-def get_all_devices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def run_scan_job(subnet: str):
     """
-    Get a list of all devices ever discovered.
+    Executes the exact same logic as your CLI main.py, 
+    but running as a direct background thread of the API.
     """
-    devices = db.query(models.DeviceLog).offset(skip).limit(limit).all()
-    return devices
-
-@app.get("/scans", response_model=List[schemas.ScanSessionResponse])
-def get_scan_history(db: Session = Depends(get_db)):
-    """
-    Get history of all scan sessions.
-    """
-    scans = db.query(models.ScanSession).order_by(models.ScanSession.start_time.desc()).all()
-
-    # Enrich with device count
-    results = []
-    for s in scans:
-        s.device_count = len(s.devices)
-        results.append(s)
-    return results
-
-@app.get("/events")
-def get_latest_events(limit: int = 50, db: Session = Depends(get_db)):
-    """
-    Fetches the most recent security events and anomalies for the timeline UI.
-    """
+    logger.info(f"Starting background scan for {subnet}")
     try:
-        # Query the database for the latest events, sorted by newest first
-        events = db.query(SecurityEvent).order_by(desc(SecurityEvent.timestamp)).limit(limit).all()
-
-        # Format the data to send to the dashboard
-        return [
-            {
-                "id": e.id,
-                "ip_address": e.ip_address,
-                "event_type": e.event_type,
-                "severity": e.severity,
-                "description": e.description,
-                "timestamp": e.timestamp.isoformat() if e.timestamp else None
-            }
-            for e in events
-        ]
+        runner = AgentRunner()
+        runner.run_assessment(subnet=subnet)
+        logger.info("Background scan completed successfully.")
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Background scan crashed: {e}")
 
-@app.get("/dashboard/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
-    """
-    Provides high-level metrics for the top of the dashboard.
-    """
+@app.post("/scan/trigger")
+def trigger_network_scan(request: ScanRequest, background_tasks: BackgroundTasks) -> Dict:
+    target = request.subnet or "192.168.30"
+    logger.info(f"API received scan command from Dashboard for: {target}")
+    
     try:
-        # Count unique IP addresses tracked
-        total_assets = db.query(func.count(func.distinct(DeviceLog.ip_address))).scalar() or 0
-
-        # Count total scan sessions run
-        total_scans = db.query(ScanSession).count()
-
-        # Get the timestamp of the most recent scan
-        latest_scan = db.query(ScanSession).order_by(desc(ScanSession.end_time)).first()
-        latest_time = latest_scan.end_time.isoformat() if latest_scan and latest_scan.end_time else "No scans yet"
-
+        # Bypass Celery entirely and use FastAPI's native background task manager
+        background_tasks.add_task(run_scan_job, target)
+        
         return {
-            "total_assets_tracked": total_assets,
-            "total_scan_runs": total_scans,
-            "latest_activity": latest_time
+            "status": "success", 
+            "message": "Scan dispatched directly to backend engine."
         }
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Failed to dispatch scan via API: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+def health_check():
+    return {"status": "online", "api": "SIN Enterprise"}

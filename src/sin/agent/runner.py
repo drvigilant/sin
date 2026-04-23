@@ -31,26 +31,29 @@ class AgentRunner:
         # Phase 1: Discovery
         raw_assets = self.discovery_module.execute_subnet_scan(subnet)
 
+        # We removed all IoT filtering blocks to ensure every discovered device
+        # passes through to the Auditor and the Database.
         enriched_assets = []
         for asset in raw_assets:
-            # Phase 2: Fingerprinting
+            # Phase 2: Fingerprinting (deeper banner analysis)
             analysis = self.fingerprint_module.analyze_asset(
-                asset['ip_address'],
-                asset['open_ports']
+                asset["ip_address"],
+                asset.get("open_ports", []),
             )
             asset.update(analysis)
 
             # Phase 3: Vulnerability Auditing
             vulns = self.audit_module.audit_device(
-                asset['ip_address'],
-                asset['open_ports']
+                ip_address=asset["ip_address"],
+                open_ports=asset.get("open_ports", []),
+                vendor=asset.get("vendor") or asset.get("manufacturer", ""),
+                os_family=asset.get("os_family", ""),
             )
-            asset['vulnerabilities'] = vulns
+            asset["vulnerabilities"] = vulns
 
-            # Standard vulnerability alerts
             if vulns:
                 logger.warning(f"⚠️ Vulnerabilities found on {asset['ip_address']}")
-                self.alerter.send_critical_alert(asset['ip_address'], vulns)
+                self.alerter.send_critical_alert(asset["ip_address"], vulns)
 
             enriched_assets.append(asset)
 
@@ -59,63 +62,68 @@ class AgentRunner:
 
     def _save_to_database(self, subnet, start, end, assets):
         db: Session = SessionLocal()
-        analyzer = StateAnalyzer(db) # Initialize our new brain
+        analyzer = StateAnalyzer(db)
 
         try:
             scan_session = models.ScanSession(
                 session_uuid=self.session_uuid,
                 subnet_target=subnet,
                 start_time=start,
-                end_time=end
+                end_time=end,
             )
             db.add(scan_session)
             db.commit()
             db.refresh(scan_session)
 
             for asset in assets:
-                # 1. THE DIFF ENGINE LOGIC
+                # 1. Diff engine
                 changes = analyzer.analyze_changes(asset)
-                
-                # 2. THE HEURISTIC LOGIC (Hardcoded rules for IoT)
+
+                # 2. Heuristic flags for dangerous ports
                 dangerous_ports = {21: "FTP", 23: "Telnet"}
-                for port in asset.get('open_ports', []):
+                for port in asset.get("open_ports", []):
                     if port in dangerous_ports:
                         changes.append({
                             "type": "HEURISTIC_FLAG",
                             "severity": "CRITICAL",
-                            "description": f"Insecure legacy protocol detected: {dangerous_ports[port]} (Port {port})."
+                            "description": (
+                                f"Insecure legacy protocol detected: "
+                                f"{dangerous_ports[port]} (Port {port})."
+                            ),
                         })
 
-                # 3. SAVE EVENTS TO DATABASE & DISCORD
+                # 3. Save events + Discord alerts
                 critical_changes = []
                 for change in changes:
-                    # Save every event to the DB for the UI Timeline
                     db_event = models.SecurityEvent(
-                        ip_address=asset['ip_address'],
-                        event_type=change['type'],
-                        severity=change['severity'],
-                        description=change['description']
+                        ip_address=asset["ip_address"],
+                        event_type=change["type"],
+                        severity=change["severity"],
+                        description=change["description"],
                     )
                     db.add(db_event)
-                    
-                    # Group criticals for Discord
-                    if change['severity'] in ['WARNING', 'CRITICAL']:
+                    if change["severity"] in ("WARNING", "CRITICAL"):
                         critical_changes.append(change)
 
                 if critical_changes:
                     logger.warning(f"⚠️ Security events triggered on {asset['ip_address']}")
-                    self.alerter.send_critical_alert(asset['ip_address'], critical_changes)
+                    self.alerter.send_critical_alert(asset["ip_address"], critical_changes)
 
-                # 4. SAVE THE DEVICE STATE (Existing logic)
+                # 4. Save enriched device state
+                enrichment_meta = asset.get("protocol_hints", []) + [
+                    f"MAC:{asset.get('mac_address','Unknown')}",
+                    f"HOST:{asset.get('hostname','Unknown')}",
+                    f"MFR:{asset.get('manufacturer', asset.get('vendor','Unknown'))}",
+                ]
                 device = models.DeviceLog(
                     scan_id=scan_session.id,
-                    ip_address=asset['ip_address'],
-                    status=asset['status'],
-                    open_ports=asset['open_ports'],
-                    protocols=asset['protocol_hints'],
-                    os_family=asset.get('os_family'),
-                    vendor=asset.get('vendor'),
-                    vulnerabilities=asset.get('vulnerabilities', [])
+                    ip_address=asset["ip_address"],
+                    status=asset["status"],
+                    open_ports=asset.get("open_ports", []),
+                    protocols=enrichment_meta,
+                    os_family=asset.get("os_family"),
+                    vendor=asset.get("vendor") or asset.get("manufacturer"),
+                    vulnerabilities=asset.get("vulnerabilities", []),
                 )
                 db.add(device)
 
@@ -129,4 +137,4 @@ class AgentRunner:
             db.close()
 
     def _persist_json(self, data: Dict, directory: str) -> None:
-        pass
+            pass
