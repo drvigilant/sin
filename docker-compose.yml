@@ -44,7 +44,6 @@ services:
     environment:
       SIN_DB_HOST: db
       SIN_REDIS_HOST: redis
-      # Make sure this is your actual Discord URL
       DISCORD_WEBHOOK_URL: "https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z"
 
   # 4. The Muscle (Worker)
@@ -52,6 +51,7 @@ services:
     build: .
     container_name: sin_worker
     command: celery -A sin.tasks.celery_app worker --loglevel=info
+    privileged: true
     volumes:
       - .:/app
     depends_on:
@@ -61,6 +61,7 @@ services:
       SIN_DB_HOST: db
       SIN_REDIS_HOST: redis
       DISCORD_WEBHOOK_URL: "https://discordapp.com/api/webhooks/1467517799265079359/MXRA9uyrWT7M6Qt4ud--Jl5dJUg1g5bZEMbzWemmTxLDvgm8O5hYGbqusCJveyT5sR8Z"
+      DEEPSEEK_API_KEY: "sk-b0e5a72ae6f34be9a395010a15487700"  # <--- YOUR KEY GOES HERE!
 
   # 5. The Scheduler (Celery Beat - NEW)
   beat:

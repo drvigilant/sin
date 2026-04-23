@@ -1,21 +1,19 @@
 click==8.1.7
 python-dotenv==1.0.0
 pyyaml==6.0.1
-pydantic==2.5.2
-# Database Layer
+pydantic>=2.6.4
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
-# API Layer
 fastapi==0.109.0
 uvicorn==0.27.0
-# UI Layer
 streamlit==1.31.0
 pandas==2.2.0
 requests==2.31.0
 plotly==5.18.0
-# Automation & Alerting
 celery==5.3.6
 redis==5.0.1
-# PDF
 fpdf2==2.7.7
+langchain==0.1.13
+langchain-openai==0.1.1
+python-nmap==0.7.1

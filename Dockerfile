@@ -4,11 +4,12 @@ FROM python:3.11-slim
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies (needed for PostgreSQL adapter)
+# Install system dependencies (needed for PostgreSQL adapter and Nmap)
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
     iputils-ping \
+    nmap \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for caching)
