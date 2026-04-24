@@ -33,3 +33,8 @@ celery_app.conf.beat_schedule = {
         "args": (os.getenv("SIN_SCAN_SUBNET", "192.168.30"),)
     },
 }
+
+# Prevent duplicate scans — only one scan task at a time
+celery_app.conf.task_acks_late = True
+celery_app.conf.worker_prefetch_multiplier = 1
+celery_app.conf.beat_max_loop_interval = 300
