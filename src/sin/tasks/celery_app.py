@@ -2,9 +2,13 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-# Define the Redis URL (using the docker container name 'redis')
 REDIS_HOST = os.getenv("SIN_REDIS_HOST", "localhost")
-BROKER_URL = f"redis://{REDIS_HOST}:6379/0"
+REDIS_PASSWORD = os.getenv("SIN_REDIS_PASSWORD", "")
+
+if REDIS_PASSWORD:
+    BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+else:
+    BROKER_URL = f"redis://{REDIS_HOST}:6379/0"
 
 celery_app = Celery(
     "sin_tasks",
@@ -19,13 +23,13 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    broker_connection_retry_on_startup=True,
 )
 
-# NEW: The Schedule Configuration
 celery_app.conf.beat_schedule = {
     "scan-network-every-5-minutes": {
-        "task": "run_network_scan",  # Name of the task in jobs.py
-        "schedule": 300.0,           # Run every 300 seconds (5 mins)
-        "args": ("172.21.41.0/24",)  # Your subnet
+        "task": "run_network_scan",
+        "schedule": 300.0,
+        "args": (os.getenv("SIN_SCAN_SUBNET", "192.168.30"),)
     },
 }
