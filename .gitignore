@@ -1,17 +1,56 @@
-
-# Build & Dist
-src/*.egg-info/
-build/
-dist/
-eggs/
-
-# Runtime Data
-data/*
-logs/*
-!data/.gitkeep
-!logs/.gitkeep
-__pycache__/
-*.py[cod]
-__pycache__/
-*.py[cod]
+# ── Secrets — NEVER commit these ─────────────────────────────────
 .env
+*.env.local
+*.env.production
+
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ── Virtual environments ──────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Data / runtime files ──────────────────────────────────────────
+/data/
+*.db
+*.sqlite
+*.sqlite3
+/var/
+
+# ── SIN runtime artifacts ─────────────────────────────────────────
+/src/sin/data/
+active_rules.json
+mitigations.json
+sin_report_*.json
+
+# ── IDE ───────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ── Docker ────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
