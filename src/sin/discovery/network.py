@@ -1,153 +1,268 @@
 """
-sin.discovery.network v6.0 (Two-Phase Async IoT Optimized Scanner)
+sin.discovery.network v8.0 — Go-powered IoT Scanner
+Calls the compiled Go binary for speed, falls back to Python if unavailable.
 """
+import json
+import os
 import socket
-import uuid
+import subprocess
 import concurrent.futures
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 
 from sin.utils.logger import get_logger
-import nmap
 
 logger = get_logger("sin.discovery.network")
 
+# Path to compiled Go scanner binary inside the container
+GO_SCANNER_PATH = os.getenv("SIN_SCANNER_PATH", "/app/bin/sin-scanner")
+
+# IoT ports for Python fallback
+IOT_PORTS = [
+    80, 443, 554, 8554, 8080, 8888, 8000,
+    37777, 34567, 1883, 8883, 5683, 1900,
+    502, 47808, 21, 22, 23, 8443,
+]
+
+PORT_SERVICES = {
+    21: "FTP", 22: "SSH", 23: "Telnet", 80: "HTTP", 443: "HTTPS",
+    554: "RTSP", 1883: "MQTT", 1900: "UPnP", 5683: "CoAP",
+    8000: "HTTP-Hikvision", 8080: "HTTP-Alt", 8443: "HTTPS-Alt",
+    8554: "RTSP-Alt", 8883: "MQTT-TLS", 8888: "HTTP-Alt2",
+    37777: "Dahua-SDK", 34567: "DVR-Web", 47808: "BACnet", 502: "Modbus",
+}
+
+NON_IOT_PORTS_ONLY = {445, 3389, 5985, 139, 135}
+CAM_VENDORS = {"hikvision", "dahua", "axis", "vivotek", "hanwha", "uniview", "reolink", "amcrest"}
+
+
 class NetworkDiscovery:
-    def __init__(self):
-        self.nm = nmap.PortScanner()
-        
-        # Phase 1: Lightweight IoT Port Sweep
-        self.iot_ports = "80,443,554,8554,1883,1900,502,5683,8080,8888,37777,34567"
-        self.sweep_args = "-Pn -T4 --max-retries 1 --host-timeout 10s --open"
-        
-        # Phase 2: Targeted Deep Scan
-        self.deep_args = "-A -T4 -Pn --max-retries 1 --host-timeout 60s"
-
-    def _get_local_subnet(self) -> str:
-        """Automatically detects the local network subnet."""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                s.connect(("8.8.8.8", 80))
-                local_ip = s.getsockname()[0]
-            octets = local_ip.split('.')
-            return f"{octets[0]}.{octets[1]}.{octets[2]}"
-        except Exception as e:
-            logger.error(f"Failed to auto-detect subnet: {e}. Defaulting to 192.168.1")
-            return "192.168.1"
-
     def execute_subnet_scan(self, subnet_cidr: str = None) -> List[Dict]:
         if not subnet_cidr:
             subnet_cidr = self._get_local_subnet()
-            
-        target_range = f"{subnet_cidr}.0/24"
-        session_id = str(uuid.uuid4())[:8].upper()
-        
-        # --- PHASE 1: LIGHTWEIGHT SWEEP ---
-        logger.info(f"[{session_id}] Phase 1: Fast IoT Sweep on {target_range} (Ports: {self.iot_ports})")
+
+        # Try Go scanner first
+        if os.path.exists(GO_SCANNER_PATH):
+            logger.info(f"🚀 Go scanner detected. Running high-speed scan on {subnet_cidr}.0/24")
+            result = self._run_go_scanner(subnet_cidr)
+            if result is not None:
+                logger.info(f"✅ Go scanner found {len(result)} IoT devices.")
+                return result
+            logger.warning("Go scanner failed, falling back to Python scanner.")
+
+        # Python fallback
+        logger.info(f"🐍 Python scanner running on {subnet_cidr}.0/24")
+        return self._python_scan(subnet_cidr)
+
+    # ── Go Scanner ────────────────────────────────────────────────────────
+
+    def _run_go_scanner(self, subnet: str) -> Optional[List[Dict]]:
         try:
-            self.nm.scan(hosts=target_range, ports=self.iot_ports, arguments=self.sweep_args)
-        except Exception as e:
-            logger.error(f"Phase 1 Sweep Failed: {e}")
-            return []
+            result = subprocess.run(
+                [GO_SCANNER_PATH, subnet],
+                capture_output=True,
+                text=True,
+                timeout=180,  # 3 min max
+            )
+            if result.returncode != 0:
+                logger.error(f"Go scanner error: {result.stderr[:200]}")
+                return None
 
-        iot_candidates = self.nm.all_hosts()
-        if not iot_candidates:
-            logger.info(f"[{session_id}] Scan complete. No IoT candidates found on subnet.")
-            return []
+            devices = json.loads(result.stdout.strip())
+            if not isinstance(devices, list):
+                return None
 
-        logger.info(f"[{session_id}] Sweep complete. Found {len(iot_candidates)} likely IoT candidates. Initiating Phase 2...")
+            # Normalize fields for compatibility with rest of pipeline
+            normalized = []
+            for d in devices:
+                d["protocol_hints"] = d.get("protocol_hints") or list(d.get("services", {}).values())
+                d["vulnerabilities"] = d.get("vulnerabilities") or []
+                normalized.append(d)
 
-        # --- PHASE 2: CONCURRENT DEEP SCAN ---
+            return normalized
+
+        except subprocess.TimeoutExpired:
+            logger.error("Go scanner timed out after 3 minutes.")
+            return None
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"Go scanner output parse error: {e}")
+            return None
+
+    # ── Python Fallback Scanner ───────────────────────────────────────────
+
+    def _python_scan(self, subnet: str) -> List[Dict]:
+        targets = [f"{subnet}.{i}" for i in range(1, 255)]
         results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            future_to_ip = {executor.submit(self._deep_scan_target, ip, session_id): ip for ip in iot_candidates}
-            
-            for future in concurrent.futures.as_completed(future_to_ip):
-                ip = future_to_ip[future]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+            futures = {executor.submit(self._scan_host, ip): ip for ip in targets}
+            for future in concurrent.futures.as_completed(futures):
                 try:
                     data = future.result()
                     if data:
                         results.append(data)
-                except Exception as e:
-                    logger.error(f"Deep scan failed for {ip}: {e}")
+                except Exception:
+                    pass
 
-        logger.info(f"[{session_id}] Assessment complete. Extracted {len(results)} confirmed devices.")
+        logger.info(f"Python scanner found {len(results)} IoT devices.")
         return results
 
-    def _deep_scan_target(self, ip: str, session_id: str) -> Optional[Dict]:
-        """Performs the intensive nmap -A scan on a single verified target."""
-        local_nm = nmap.PortScanner() # Use local instance for thread safety
-        
-        try:
-            local_nm.scan(ip, arguments=self.deep_args)
-        except Exception:
+    def _scan_host(self, ip: str) -> Optional[Dict]:
+        open_ports = self._scan_ports(ip)
+        if not open_ports:
             return None
 
-        if ip not in local_nm.all_hosts():
+        ports_set = set(open_ports)
+
+        # Drop pure Windows/PC devices
+        if ports_set.issubset(NON_IOT_PORTS_ONLY):
+            return None
+        if len(ports_set) == 1 and 22 in ports_set:
+            return None
+        if ports_set.issubset({80, 443, 22, 8080}) and 554 not in ports_set:
             return None
 
-        host_data = local_nm[ip]
-        
-        # Extract Hardware & OS Info
-        mac_addr = host_data.get("addresses", {}).get("mac", "Hidden by NAT")
-        hostname = host_data.hostname() or "Unresolved"
-        
-        os_family = "Unknown"
-        if "osmatch" in host_data and len(host_data["osmatch"]) > 0:
-            os_family = host_data["osmatch"][0].get("name", "Unknown")
+        mac      = self._get_mac(ip)
+        hostname = self._resolve_hostname(ip)
+        vendor   = self._lookup_vendor(mac)
 
-        vendor = host_data.get("vendor", {}).get(mac_addr, "Generic")
+        http_banner = ""
+        for p in [80, 8080, 8000, 8888]:
+            if p in ports_set:
+                http_banner = self._grab_http_banner(ip, p)
+                if http_banner:
+                    break
 
-        # Process Ports & Services
-        open_ports = []
-        services_dict = {}
-        iot_score = 0
+        if vendor == "Unknown" and http_banner:
+            bl = http_banner.lower()
+            for v in CAM_VENDORS:
+                if v in bl:
+                    vendor = v.capitalize()
+                    break
 
-        if "tcp" in host_data:
-            for port, srv in host_data["tcp"].items():
-                if srv["state"] == "open":
-                    open_ports.append(port)
-                    svc_name = srv.get("product") or srv.get("name") or f"TCP/{port}"
-                    services_dict[port] = svc_name
-                    
-                    # Heuristic Scoring
-                    if port in [554, 8554, 37777, 34567]: iot_score += 3 # High confidence Video/NVR
-                    elif port in [1883, 5683, 502]: iot_score += 2       # Moderate confidence OT/IoT
-                    elif port in [8080, 8888, 1900]: iot_score += 1      # Low confidence generic web
-                    
-                    if "camera" in svc_name.lower() or "dvr" in svc_name.lower(): iot_score += 3
+        os_family, device_type = self._classify(open_ports, vendor, http_banner)
 
-                    # CPE Vendor Overrides
-                    cpe = srv.get("cpe", "").lower()
-                    if "hikvision" in cpe: vendor = "Hikvision"; iot_score += 5
-                    elif "dahua" in cpe: vendor = "Dahua"; iot_score += 5
-
-        # IoT Confidence Classification
-        if iot_score >= 4:
-            device_type = "Confirmed IoT / Camera"
-            confidence = "High"
-        elif iot_score >= 2:
-            device_type = "Likely IoT / Embedded"
-            confidence = "Moderate"
-        elif 445 in open_ports or 3389 in open_ports:
-            device_type = "Windows Server/PC"
-            confidence = "Not IoT"
-        else:
-            device_type = "Generic Network Node"
-            confidence = "Low"
+        services = {}
+        protocols = []
+        for p in open_ports:
+            svc = PORT_SERVICES.get(p, f"TCP/{p}")
+            services[str(p)] = svc
+            protocols.append(svc)
 
         return {
-            "scan_session_id": session_id,
-            "ip_address": ip,
-            "status": "online",
-            "mac_address": mac_addr,
-            "hostname": hostname,
-            "manufacturer": vendor,
-            "os_family": os_family,
-            "device_type": f"{device_type} (Confidence: {confidence})",
-            "open_ports": open_ports,
-            "services": services_dict,
+            "ip_address":     ip,
+            "status":         "online",
+            "mac_address":    mac,
+            "hostname":       hostname,
+            "manufacturer":   vendor,
+            "vendor":         vendor,
+            "os_family":      os_family,
+            "device_type":    device_type,
+            "open_ports":     open_ports,
+            "services":       services,
+            "protocol_hints": protocols,
             "vulnerabilities": [],
-            "last_seen": datetime.now(timezone.utc).isoformat(),
-            "scan_method": "Optimized Two-Phase"
+            "last_seen":      datetime.now(timezone.utc).isoformat(),
+            "scan_method":    "python-fallback",
         }
+
+    def _scan_ports(self, ip: str) -> List[int]:
+        open_ports = []
+
+        def check(port):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(1.0)
+                    if s.connect_ex((ip, port)) == 0:
+                        return port
+            except Exception:
+                pass
+            return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+            results = ex.map(check, IOT_PORTS)
+
+        return [p for p in results if p]
+
+    def _get_mac(self, ip: str) -> str:
+        try:
+            with open("/proc/net/arp") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 4 and parts[0] == ip:
+                        mac = parts[3]
+                        if mac != "00:00:00:00:00:00":
+                            return mac.upper()
+        except Exception:
+            pass
+        return "Unknown"
+
+    def _resolve_hostname(self, ip: str) -> str:
+        try:
+            return socket.gethostbyaddr(ip)[0]
+        except Exception:
+            return "Unknown"
+
+    def _lookup_vendor(self, mac: str) -> str:
+        OUI = {
+            "C8F742": "Hikvision", "D8C4E9": "Hikvision", "A4143E": "Hikvision",
+            "F48B32": "Hikvision", "BC0F9A": "Hikvision",
+            "E0987B": "Dahua",    "3C1A57": "Dahua",    "704DB7": "Dahua",
+            "ACCC8E": "Axis",     "B8A44E": "Axis",
+            "4C5E0C": "MikroTik", "D4CA6D": "MikroTik", "E4A7A0": "MikroTik",
+            "788A20": "Ubiquiti", "E063DA": "Ubiquiti",
+            "B0487A": "TP-Link",  "F81A67": "TP-Link",
+            "EC7176": "Reolink",  "DCEF09": "Amcrest",
+        }
+        clean = mac.replace(":", "").replace("-", "").upper()
+        if len(clean) >= 6:
+            return OUI.get(clean[:6], "Unknown")
+        return "Unknown"
+
+    def _grab_http_banner(self, ip: str, port: int) -> str:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(2)
+                s.connect((ip, port))
+                s.sendall(f"HEAD / HTTP/1.0\r\nHost: {ip}\r\n\r\n".encode())
+                resp = s.recv(1024).decode(errors="ignore")
+                for line in resp.split("\r\n"):
+                    if line.lower().startswith("server:"):
+                        return line.split(":", 1)[1].strip()
+        except Exception:
+            pass
+        return ""
+
+    def _classify(self, ports: List[int], vendor: str, banner: str):
+        port_set = set(ports)
+        score = 0
+        if 554 in port_set or 8554 in port_set: score += 3
+        if 37777 in port_set or 34567 in port_set: score += 3
+        if 8000 in port_set: score += 2
+        if 1883 in port_set: score += 2
+
+        vl = vendor.lower()
+        bl = banner.lower()
+        for v in CAM_VENDORS:
+            if v in vl or v in bl:
+                score += 5
+
+        if 445 in port_set or 3389 in port_set:
+            return "Windows", "workstation"
+        if "mikrotik" in vl: return "RouterOS", "router"
+        if "ubiquiti" in vl: return "UniFi OS", "router"
+
+        if score >= 5:   return "Embedded Linux", "camera"
+        if 37777 in port_set or 34567 in port_set: return "Embedded Linux", "nvr_dvr"
+        if score >= 2:   return "Embedded Linux", "iot"
+        return "Unknown", "unknown"
+
+    def _get_local_subnet(self) -> str:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+            parts = ip.split(".")
+            return f"{parts[0]}.{parts[1]}.{parts[2]}"
+        except Exception:
+            return "192.168.1"

@@ -1,26 +1,31 @@
-# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set the working directory
-WORKDIR /app
-
-# Install system dependencies (needed for PostgreSQL adapter and Nmap)
+# Install system deps + Go
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
     iputils-ping \
     nmap \
+    arp-scan \
+    net-tools \
+    golang-go \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for caching)
+WORKDIR /app
+
+# Build Go scanner
+COPY scanner/sin-scanner.go /tmp/sin-scanner.go
+RUN mkdir -p /app/bin && \
+    cd /tmp && \
+    go build -o /app/bin/sin-scanner sin-scanner.go && \
+    chmod +x /app/bin/sin-scanner && \
+    echo "✅ Go scanner built successfully"
+
+# Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
 COPY . .
-
-# Install the package in editable mode
 RUN pip install -e .
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "main.py", "scan"]
+ENV SIN_SCANNER_PATH=/app/bin/sin-scanner
