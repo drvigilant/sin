@@ -41,7 +41,11 @@ class NetworkDiscovery:
         if not subnet_cidr:
             subnet_cidr = self._get_local_subnet()
 
-        # Try Go scanner first
+        # FIX: Normalise subnet — strip /24 suffix and .0 so we always get "A.B.C"
+        subnet_cidr = subnet_cidr.split("/")[0]
+        if subnet_cidr.endswith(".0"):
+            subnet_cidr = subnet_cidr[:-2]
+
         if os.path.exists(GO_SCANNER_PATH):
             logger.info(f"🚀 Go scanner detected. Running high-speed scan on {subnet_cidr}.0/24")
             result = self._run_go_scanner(subnet_cidr)
@@ -50,7 +54,6 @@ class NetworkDiscovery:
                 return result
             logger.warning("Go scanner failed, falling back to Python scanner.")
 
-        # Python fallback
         logger.info(f"🐍 Python scanner running on {subnet_cidr}.0/24")
         return self._python_scan(subnet_cidr)
 
