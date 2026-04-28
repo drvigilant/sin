@@ -31,12 +31,12 @@ def _is_iot(asset: Dict) -> bool:
     ports   = set(asset.get("open_ports", []))
     mfr     = asset.get("manufacturer", asset.get("vendor", ""))
     os_hint = asset.get("os_family", "").lower()
-    if not ports:                                    return False
-    if mfr in _NON_IOT_MFR:                         return False
-    if any(h in os_hint for h in _NON_IOT_OS):      return False
-    if _IOT_HARD.intersection(ports):                return True
-    if ports.issubset(_PC_ONLY):                     return False
-    if ports.issubset({80, 443, 22, 8080}):          return False
+    if not ports:                               return False
+    if mfr in _NON_IOT_MFR:                    return False
+    if any(h in os_hint for h in _NON_IOT_OS): return False
+    if _IOT_HARD.intersection(ports):           return True
+    if ports.issubset(_PC_ONLY):               return False
+    if ports.issubset({80, 443, 22, 8080}):    return False
     return True
 
 
@@ -57,7 +57,6 @@ class AgentRunner:
         raw_assets = self.discovery_module.execute_subnet_scan(subnet)
         logger.info(f"Discovery complete. Total assets found: {len(raw_assets)}")
 
-        # Phase 2: Fingerprint then IoT filter
         iot_assets = []
         for asset in raw_assets:
             analysis = self.fingerprint_module.analyze_asset(
@@ -70,18 +69,15 @@ class AgentRunner:
                 iot_assets.append(asset)
             else:
                 logger.info(
-                    f"🚫 Dropped Non-IoT: {asset['ip_address']} "
+                    f"Dropped Non-IoT: {asset['ip_address']} "
                     f"| Ports: {asset.get('open_ports',[])} "
-                    f"| Vendor: {asset.get('vendor','?')} "
-                    f"| OS: {asset.get('os_family','?')}"
+                    f"| Vendor: {asset.get('vendor','?')}"
                 )
 
-        logger.info(f"✅ IoT assets after filter: {len(iot_assets)} / {len(raw_assets)}")
+        logger.info(f"IoT assets after filter: {len(iot_assets)} / {len(raw_assets)}")
 
-        # Phase 3: Audit + Decision
         enriched_assets = []
         for asset in iot_assets:
-            # Vulnerability audit
             vulns = self.audit_module.audit_device(
                 ip_address=asset["ip_address"],
                 open_ports=asset.get("open_ports", []),
@@ -90,13 +86,10 @@ class AgentRunner:
             )
             asset["vulnerabilities"] = vulns
 
-            # Risk scoring
             risk = calculate_risk(asset)
             asset["risk_score"] = risk["risk_score"]
-            asset["risk_level"]  = risk["risk_level"]
+            asset["risk_level"] = risk["risk_level"]
 
-            # FIX 1: normalize_host BEFORE it is used — removed the debug
-            # print that referenced normalized_asset before assignment
             normalized_asset = normalize_host(asset)
             verdict = self.decision.evaluate(normalized_asset)
 
@@ -119,12 +112,13 @@ class AgentRunner:
 
             if verdict.recommended_action == "isolate" and verdict.confidence >= 0.80:
                 logger.warning(
-                    f"🔴 AUTO-ISOLATING {asset['ip_address']} | confidence={verdict.confidence:.2f}"
+                    f"AUTO-ISOLATING {asset['ip_address']} | "
+                    f"confidence={verdict.confidence:.2f}"
                 )
                 self.mitigation.isolate(asset, verdict)
 
             if vulns:
-                logger.warning(f"⚠️ Vulnerabilities found on {asset['ip_address']}")
+                logger.warning(f"Vulnerabilities found on {asset['ip_address']}")
 
             enriched_assets.append(asset)
 
@@ -154,7 +148,10 @@ class AgentRunner:
                         changes.append({
                             "type": "HEURISTIC_FLAG",
                             "severity": "CRITICAL",
-                            "description": f"Insecure protocol: {dangerous_ports[port]} (Port {port}) on {asset['ip_address']}.",
+                            "description": (
+                                f"Insecure protocol: {dangerous_ports[port]} "
+                                f"(Port {port}) on {asset['ip_address']}."
+                            ),
                         })
 
                 critical_changes = []
@@ -169,7 +166,7 @@ class AgentRunner:
                         critical_changes.append(change)
 
                 if critical_changes:
-                    logger.warning(f"⚠️ Security events triggered on {asset['ip_address']}")
+                    logger.warning(f"Security events triggered on {asset['ip_address']}")
                     self.alerter.send_critical_alert(asset["ip_address"], critical_changes)
 
                 enrichment_meta = list(set(asset.get("protocol_hints", []))) + [
@@ -190,10 +187,10 @@ class AgentRunner:
                 ))
 
             db.commit()
-            logger.info(f"✅ Saved {len(assets)} IoT devices to database.")
+            logger.info(f"Saved {len(assets)} IoT devices to database.")
 
         except Exception as e:
-            logger.error(f"❌ Database save failed: {e}")
+            logger.error(f"Database save failed: {e}")
             db.rollback()
         finally:
             db.close()

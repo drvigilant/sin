@@ -97,7 +97,7 @@ class NetworkDiscovery:
         targets = [f"{subnet}.{i}" for i in range(1, 255)]
         results = []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=150) as executor:
             futures = {executor.submit(self._scan_host, ip): ip for ip in targets}
             for future in concurrent.futures.as_completed(futures):
                 try:
@@ -175,7 +175,7 @@ class NetworkDiscovery:
         def check(port):
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(1.0)
+                    s.settimeout(1.5)
                     if s.connect_ex((ip, port)) == 0:
                         return port
             except Exception:
