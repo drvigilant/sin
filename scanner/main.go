@@ -12,8 +12,19 @@ import (
 	"time"
 )
 
-// 8899 is the secret 'ONVIF' port for many XM/Dahua devices
-var targetPorts = []int{80, 443, 554, 34567, 37777, 8080, 8899}
+// targetPorts mirrors sin-scanner.go iotPorts so both binaries
+// cover the same attack surface.
+// Added vs original: 21(FTP) 22(SSH) 23(Telnet) 502(Modbus)
+//                    1883(MQTT) 1900(SSDP) 4840(OPC-UA) 5683(CoAP)
+//                    8000(Hikvision) 8443(HTTPS-alt) 8554(RTSP-alt)
+//                    8883(MQTT-TLS) 8888(HTTP-alt) 47808(BACnet)
+var targetPorts = []int{
+	80, 443, 554, 8554, 8080, 8888, 8000,
+	37777, 34567, 8899,
+	1883, 8883, 5683, 1900,
+	502, 47808, 4840,
+	21, 22, 23, 8443,
+}
 
 type Device struct {
 	IPAddress    string         `json:"ip_address"`
@@ -156,8 +167,23 @@ func directOnvifProbe(ip string, port int) (string, string) {
 		n, err := conn.Read(buf)
 		if err == nil {
 			raw := string(buf[:n])
-			if strings.Contains(raw, "Xiongmai") || strings.Contains(raw, "XM") {
-				return "Xiongmai", "ONVIF Smart Camera"
+			// Expanded vendor recognition — previously only Xiongmai was checked.
+			// Any ONVIF-responding device now gets a vendor label.
+			switch {
+			case strings.Contains(raw, "Xiongmai") || strings.Contains(raw, "XM"):
+				return "Xiongmai (XM) OEM", "ONVIF Smart Camera"
+			case strings.Contains(raw, "HIKVISION") || strings.Contains(raw, "Hikvision"):
+				return "Hikvision", "ONVIF IP Camera"
+			case strings.Contains(raw, "dahuasecurity") || strings.Contains(raw, "Dahua"):
+				return "Dahua", "ONVIF IP Camera"
+			case strings.Contains(raw, "AXIS") || strings.Contains(raw, "Axis"):
+				return "Axis Communications", "ONVIF IP Camera"
+			case strings.Contains(raw, "Uniview") || strings.Contains(raw, "uniview"):
+				return "Uniview", "ONVIF IP Camera"
+			case strings.Contains(raw, "Reolink"):
+				return "Reolink", "ONVIF IP Camera"
+			case strings.Contains(raw, "NetworkVideoTransmitter"):
+				return "Unknown ONVIF", "ONVIF IP Camera"
 			}
 		}
 	}
@@ -166,16 +192,29 @@ func directOnvifProbe(ip string, port int) (string, string) {
 
 func grabBanner(conn net.Conn, ip string, port int) string {
 	conn.SetReadDeadline(time.Now().Add(1500 * time.Millisecond))
-	if port == 80 || port == 8080 || port == 8899 {
-		fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", ip)
-	} else if port == 554 {
-		fmt.Fprintf(conn, "OPTIONS rtsp://%s:554/ RTSP/1.0\r\nCSeq: 1\r\n\r\n", ip)
+	switch port {
+	case 80, 8080, 8000, 8888, 8899:
+		fmt.Fprintf(conn, "GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/5.0\r\n\r\n", ip)
+	case 554, 8554:
+		fmt.Fprintf(conn, "OPTIONS rtsp://%s:%d/ RTSP/1.0\r\nCSeq: 1\r\n\r\n", ip, port)
+	// FTP(21), Telnet(23), MQTT(1883) send banners on connect — just read
 	}
 	reader := bufio.NewReader(conn)
-	for i := 0; i < 5; i++ {
-		line, _ := reader.ReadString('\n')
-		if strings.HasPrefix(line, "Server:") || strings.Contains(line, "DVR") {
-			return strings.TrimSpace(line)
+	for i := 0; i < 8; i++ {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Server:") ||
+			strings.HasPrefix(line, "RTSP/") ||
+			strings.HasPrefix(line, "220 ") ||
+			strings.Contains(line, "DVR") ||
+			strings.Contains(line, "Camera") ||
+			strings.Contains(line, "Hikvision") ||
+			strings.Contains(line, "Dahua") ||
+			strings.Contains(line, "H264DVR") {
+			return line
 		}
 	}
 	return ""
@@ -189,20 +228,75 @@ func ClassifyDevice(ports []int, banners map[int]string) (string, string, string
 	method := "Signature Analysis"
 
 	allBanners := strings.ToLower(fmt.Sprintf("%v", banners))
-	
-	// 🧠 Advanced Heuristic: The 'H264DVR' signature is unique to Xiongmai hardware
-	if strings.Contains(allBanners, "h264dvr") || strings.Contains(allBanners, "dvr") {
+
+	// ── Banner-based vendor identification ───────────────────────────────
+	switch {
+	case strings.Contains(allBanners, "h264dvr") || strings.Contains(allBanners, "xm-"):
 		vendor = "Xiongmai (XM) OEM"
 		model = "XM-Embedded-DVR"
 		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "hikvision") || strings.Contains(allBanners, "webs"):
+		vendor = "Hikvision"
+		model = "Hikvision IP Camera"
+		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "dahua"):
+		vendor = "Dahua"
+		model = "Dahua IP Camera"
+		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "axis"):
+		vendor = "Axis Communications"
+		model = "Axis IP Camera"
+		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "goahead"):
+		vendor = "Generic OEM (GoAhead)"
+		model = "Embedded Camera"
+		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "uc-httpd"):
+		vendor = "Xiongmai (XM) OEM"
+		model = "UC-HTTPd Camera"
+		method = "Deep Banner Interrogation"
+	case strings.Contains(allBanners, "dvr"):
+		vendor = "Generic DVR OEM"
+		model = "Embedded DVR"
+		method = "Deep Banner Interrogation"
 	}
 
-	// Port 34567 is the 'Sofia' protocol - 100% Xiongmai
+	// ── Port-based protocol signatures (override banner if more specific) ─
 	for _, p := range ports {
-		if p == 34567 {
+		switch p {
+		case 34567:
+			// Sofia protocol — exclusive to Xiongmai silicon
 			vendor = "Xiongmai (XM) OEM"
 			model = "Sofia-Protocol Device"
-			method = "Port-Protocol Mapping"
+			method = "Port-Protocol Mapping (Sofia/34567)"
+		case 37777:
+			// Dahua SDK port
+			if vendor == "Unknown" {
+				vendor = "Dahua"
+				model = "Dahua NVR/DVR"
+				method = "Port-Protocol Mapping (Dahua-SDK/37777)"
+			}
+		case 8000:
+			// Hikvision SDK / HTTP preview port
+			if vendor == "Unknown" {
+				vendor = "Hikvision"
+				model = "Hikvision DVR/NVR"
+				method = "Port-Protocol Mapping (HIK-SDK/8000)"
+			}
+		case 502:
+			deviceType = "ICS/OT Device"
+			osFam = "Embedded RTOS"
+			if vendor == "Unknown" {
+				model = "Modbus Device"
+				method = "Port-Protocol Mapping (Modbus/502)"
+			}
+		case 47808:
+			deviceType = "ICS/OT Device"
+			osFam = "Embedded RTOS"
+			if vendor == "Unknown" {
+				model = "BACnet Device"
+				method = "Port-Protocol Mapping (BACnet/47808)"
+			}
 		}
 	}
 
