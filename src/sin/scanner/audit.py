@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Tuple
 from sin.utils.logger import get_logger
+from sin.scanner.kev_intel import kev as _kev
 
 logger = get_logger("sin.scanner.audit")
 
@@ -128,5 +129,13 @@ class AuditEngine:
         else:
             action = "log_only"
 
-        logger.info(f"✅ Brain Decision for {ip} | Risk: {risk_score} | Action: {action}")
+        # ── LAYER 5: CISA KEV cross-reference ──────────────────────────────
+        # Upgrade severity to CRITICAL for any CVE in the KEV catalog
+        vulnerabilities = _kev.flag_kev_matches(vulnerabilities)
+        kev_hits = [v for v in vulnerabilities if v.get("in_kev")]
+        if kev_hits:
+            risk_score = min(risk_score + 15, 100)
+            action = "quarantine"
+
+        logger.info(f"✅ Brain Decision for {ip} | Risk: {risk_score} | Action: {action} | KEV hits: {len(kev_hits)}")
         return vulnerabilities, risk_score, action
