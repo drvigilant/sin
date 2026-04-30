@@ -18,3 +18,4 @@ langchain==0.1.13
 langchain-openai==0.1.1
 python-nmap==0.7.1
 scapy==2.5.0
+websockets>=12.0

@@ -178,9 +178,11 @@ def _build_stats(db: Session) -> dict:
     total = len(devices)
     vulnerable = sum(1 for d in devices if d.vulnerabilities)
     critical = sum(sum(1 for v in (d.vulnerabilities or []) if v.get("severity") == "CRITICAL") for d in devices)
+    isolated = sum(1 for d in devices if d.status == "mitigated")
     scans = db.query(models.ScanSession).count()
     return {
-        "total_devices": total, "total_assets_tracked": total, "vulnerable": vulnerable, "critical": critical, "clean": total - vulnerable,
+        "total_devices": total, "total_assets_tracked": total, "vulnerable": vulnerable, "critical": critical,
+        "isolated": isolated, "clean": total - vulnerable,
         "total_scans": scans, "total_scan_runs": scans, "latest_activity": latest_session.start_time.isoformat(), "scanning": _is_scan_running(),
     }
 
