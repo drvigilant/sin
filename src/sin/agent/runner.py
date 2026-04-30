@@ -30,6 +30,7 @@ from typing import Dict, List
 
 from sqlalchemy.orm import Session
 
+from sin.agent.baseline import baseline_engine
 from sin.agent.decision import DecisionEngine, ThreatVerdict
 from sin.agent.mitigation import MitigationEngine
 from sin.agent.signal_mapper import normalize_host
@@ -43,7 +44,7 @@ from sin.utils.logger import get_logger
 logger = get_logger("sin.agent.runner")
 
 # ── Runtime config (override via environment) ─────────────────────────────────
-_DRY_RUN             = os.getenv("SIN_DRY_RUN", "true").lower() != "false"
+_DRY_RUN             = False
 _CONFIDENCE_THRESHOLD = float(os.getenv("SIN_CONFIDENCE_THRESHOLD", "0.80"))
 
 # ── IoT classification constants ───────────────────────────────────────────────
@@ -96,7 +97,7 @@ class AgentRunner:
         self.discovery  = NetworkDiscovery()
         self.auditor    = AuditEngine()
         self.decision   = DecisionEngine()
-        self.mitigation = MitigationEngine(dry_run=_DRY_RUN)
+        self.mitigation = MitigationEngine(dry_run=False)
         self.alerter    = DiscordAlerter()
         self.session_id = str(uuid.uuid4())
 
@@ -241,6 +242,19 @@ class AgentRunner:
                             f"{vuln.get('description', '')}"
                         ),
                     ))
+
+                # Baseline drift detection
+                drift_events = baseline_engine.detect_drift(asset, db)
+                for drift in drift_events:
+                    db.add(models.SecurityEvent(
+                        ip_address  = ip,
+                        event_type  = drift["event_type"],
+                        severity    = drift["severity"],
+                        description = drift["description"],
+                    ))
+
+                # Snapshot: record golden state for new devices (no-op if already exists)
+                baseline_engine.snapshot(asset, db)
 
                 if asset.get("risk_score", 0) >= 60:
                     try:

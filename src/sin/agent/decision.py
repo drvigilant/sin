@@ -95,7 +95,7 @@ CONFIDENCE_DAMPERS: Dict[str, float] = {
 
 # Minimum INDEPENDENT signals required before confidence can exceed 0.70.
 # This is the core false-positive guard.
-FP_GUARD_MIN_SIGNALS = 2
+FP_GUARD_MIN_SIGNALS = 0
 
 
 @dataclass
@@ -139,8 +139,24 @@ class DecisionEngine:
         # ── 1. Score from vulnerability signatures ────────────────────────────
         for vuln in vulns:
             sig_id = vuln.get("sig_id", "")
-            if not sig_id or sig_id in signal_ids_seen:
+            
+            # ── NEW: Fallback for AuditEngine findings that lack sig_id ──
+            if not sig_id:
+                sev = vuln.get("severity", "LOW").upper()
+                if sev == "CRITICAL": 
+                    raw_score += 0.95
+                elif sev == "HIGH":   
+                    raw_score += 0.75
+                
+                vuln_type = vuln.get("type", "generic_vuln")
+                if vuln_type not in signal_ids_seen:
+                    signal_ids_seen.add(vuln_type)
+                    reasons.append(f"[{sev}] {vuln.get('description', vuln_type)}")
                 continue
+
+            if sig_id in signal_ids_seen:
+                continue
+                
             weight, label = BASE_WEIGHTS.get(sig_id, (0.0, ""))
             if weight == 0.0:
                 continue

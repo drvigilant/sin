@@ -13,9 +13,7 @@ from sin.utils.logger import get_logger
 
 logger = get_logger("sin.storage.registry")
 
-# Simple file-based whitelist (no extra migration needed)
 _WHITELIST_PATH = Path("/var/lib/sin/whitelist.json")
-
 
 def _load_whitelist() -> set:
     try:
@@ -26,13 +24,11 @@ def _load_whitelist() -> set:
         pass
     return set()
 
-
 def _save_whitelist(wl: set) -> None:
     try:
         _WHITELIST_PATH.write_text(json.dumps(list(wl)))
     except Exception as e:
         logger.error(f"Whitelist save failed: {e}")
-
 
 class DeviceRegistry:
 
@@ -85,6 +81,56 @@ class DeviceRegistry:
             logger.error(f"upsert failed for {host.get('ip_address')}: {e}")
         finally:
             db.close()
+
+    def bulk_process(self, hosts: list) -> dict:
+        """
+        Upserts all hosts in a single transaction.
+        Returns a dictionary mapping {ip_address: is_new_boolean}.
+        """
+        db = SessionLocal()
+        new_status = {}
+        try:
+            ips = [h["ip_address"] for h in hosts]
+            existing = db.query(DeviceLog).filter(DeviceLog.ip_address.in_(ips)).all()
+            existing_map = {r.ip_address: r for r in existing}
+
+            for host in hosts:
+                ip = host["ip_address"]
+                record = existing_map.get(ip)
+
+                if record:
+                    new_status[ip] = False
+                    record.hostname        = host.get("hostname")
+                    record.status          = host.get("status", "online")
+                    record.vendor          = host.get("manufacturer")
+                    record.os_family       = host.get("os_family")
+                    record.open_ports      = host.get("open_ports", [])
+                    record.protocols       = host.get("protocol_hints", [])
+                    record.vulnerabilities = host.get("vulnerabilities", [])
+                else:
+                    new_status[ip] = True
+                    record = DeviceLog(
+                        scan_id        = None,
+                        ip_address     = ip,
+                        hostname       = host.get("hostname"),
+                        status         = host.get("status", "online"),
+                        vendor         = host.get("manufacturer"),
+                        os_family      = host.get("os_family"),
+                        open_ports     = host.get("open_ports", []),
+                        protocols      = host.get("protocol_hints", []),
+                        vulnerabilities= host.get("vulnerabilities", []),
+                    )
+                    db.add(record)
+                    existing_map[ip] = record  # Prevent duplicates in the same batch
+
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"bulk_process failed: {e}")
+        finally:
+            db.close()
+
+        return new_status
 
     def get_all_in_subnet(self, subnet: str) -> List[str]:
         """Return all IPs whose prefix matches subnet (e.g. '192.168.30')."""

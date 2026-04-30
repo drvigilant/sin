@@ -2,8 +2,138 @@ import os
 from typing import Dict, List, Tuple
 from sin.utils.logger import get_logger
 from sin.scanner.kev_intel import kev as _kev
+from sin.scanner.epss_intel import epss as _epss
+from sin.scanner.cred_check import cred_checker as _creds
 
 logger = get_logger("sin.scanner.audit")
+
+# ── Remediation playbooks ──────────────────────────────────────────────────────
+# Keyed by CVE ID (uppercase) or finding type string.
+# CVE keys take precedence over type keys.
+REMEDIATION_DB: Dict[str, List[str]] = {
+    # ── CVE-specific playbooks ─────────────────────────────────────────────────
+    "CVE-2018-10088": [
+        "Immediately block TCP port 34567 at the perimeter firewall (iptables: `iptables -I INPUT -p tcp --dport 34567 -j DROP`).",
+        "Update Xiongmai firmware to version 4.02.R11.Xiongmai-8 or later via the web UI at http://<device-ip>/System/firmwareUpgrade.",
+        "If firmware update is unavailable, replace the device — Xiongmai devices below firmware 2018-Q2 have no patch.",
+        "Change the default admin password from '888888' via Setup → Account → Change Password.",
+        "Disable the XMEye P2P cloud relay in Network → P2P → Disable to prevent botnet re-infection.",
+    ],
+    "CVE-2017-7921": [
+        "Update Hikvision firmware to v5.4.5 build 170123 or later: Device Web UI → Configuration → System → Maintenance → Upgrade.",
+        "Block unauthenticated access to the ISAPI endpoint: deny HTTP GET /ISAPI/* from untrusted networks at the firewall.",
+        "Disable the 'Illegal Login' lockout bypass by enabling account lockout: Configuration → System → Security → Security Service → Enable Illegal Login Lock.",
+        "Rotate all admin credentials immediately (default admin/12345 is widely known).",
+        "Enable HTTPS-only access: Configuration → Network → Advanced Settings → HTTPS → Enable.",
+    ],
+    "CVE-2021-36260": [
+        "Update Hikvision firmware to v5.5.800 or later (released 2021-09-18): Configuration → System → Maintenance → Upgrade.",
+        "Block network access to port 80/443 from untrusted segments — this CVE is exploitable via the web management interface.",
+        "Apply Hikvision Security Hardening Guide: disable SSH (port 22), Telnet (port 23), and UPnP.",
+        "Monitor for POST requests to /SDK/webLanguage — the specific exploit endpoint for this RCE.",
+    ],
+    "CVE-2021-33044": [
+        "Update Dahua firmware to the version published 2021-10-22 or later via Smart PSS or DMSS: Main Menu → Upgrade.",
+        "Block TCP port 37777 (Dahua private protocol) at the perimeter — this CVE requires network access to that port.",
+        "Disable the Dahua P2P cloud service: Main Menu → Network → TCP/IP → P2P → Disable.",
+        "Change default credentials (admin/admin) via Main Menu → Account → Change Password.",
+        "Enable two-factor authentication if on firmware ≥ 2.820: Main Menu → Account → 2FA Settings.",
+    ],
+    "CVE-2021-33045": [
+        "Apply the same Dahua firmware patch as CVE-2021-33044 — both are fixed in the 2021-10-22 release.",
+        "Block TCP port 37777 at the firewall.",
+        "Audit all active sessions via Main Menu → System Info → Online User and terminate unknown sessions.",
+    ],
+    "CVE-2022-30525": [
+        "Update Zyxel USG FLEX / ATP / VPN firmware to v5.30 or later via Web GUI → Maintenance → Firmware Upgrade.",
+        "Block access to the web management interface (port 443/80) from the internet — apply an ACL on the WAN interface.",
+        "Disable the CGI management endpoint if firmware update is not immediately possible: contact Zyxel TAC.",
+        "Rotate all admin credentials and audit firewall rules for lateral movement.",
+    ],
+    "CVE-2023-20198": [
+        "Apply Cisco IOS XE patch: upgrade to 17.9.4a, 17.6.6a, or 16.12.10a depending on your train.",
+        "Immediately disable HTTP/HTTPS server if not required: `no ip http server` and `no ip http secure-server`.",
+        "Check for implanted web shells via `show platform software fed active punt cpuq rates` and inspect /usr/binos/conf/nginx-conf/nginx.conf.",
+        "Rotate all enable secrets and local usernames immediately.",
+    ],
+    # ── Finding-type playbooks (fallback when CVE is absent) ──────────────────
+    "Cleartext Management": [
+        "Disable Telnet immediately: `service telnet disable` or equivalent for your device OS.",
+        "Enable SSH v2 as the replacement: set minimum SSH version to 2 and use 2048-bit RSA host keys.",
+        "Block TCP port 23 at the perimeter firewall: `iptables -I INPUT -p tcp --dport 23 -j DROP`.",
+        "Audit all devices for shared/default Telnet passwords — Mirai uses 62 known default credential pairs.",
+        "If the device cannot disable Telnet, isolate it on a management VLAN with no internet routing.",
+    ],
+    "Insecure IoT Messaging": [
+        "Enable MQTT broker authentication: set `allow_anonymous false` in mosquitto.conf and create user ACLs.",
+        "Enable TLS on the MQTT broker (port 8883) and disable the plaintext listener on port 1883.",
+        "Apply topic-level ACLs to restrict which clients can publish to control topics.",
+        "If using cloud MQTT (AWS IoT, Azure IoT Hub), rotate all device certificates and revoke compromised ones.",
+        "Block external access to port 1883 at the firewall; restrict to internal management VLAN only.",
+    ],
+    "Privacy Leak (RTSP)": [
+        "Enable RTSP authentication: set username/password in the camera web UI under Configuration → Network → Video → RTSP Authentication.",
+        "Use RTSP over TLS (RTSPS, port 322) or tunnel via HTTPS where the device supports it.",
+        "Block TCP ports 554 and 8554 from untrusted networks at the firewall.",
+        "Rotate the RTSP stream credentials — default rtsp://admin:12345@<ip>/stream is well-known.",
+        "Enable digest authentication (stronger than basic) if supported: Configuration → Security → Authentication Method → Digest.",
+    ],
+    "Service Discovery Leak": [
+        "Disable UPnP on the device: router/device web UI → Advanced → UPnP → Disable.",
+        "Block UDP port 1900 (SSDP) at the perimeter to prevent external enumeration.",
+        "Audit UPnP port mappings via `upnpc -l` and remove any unexpected external-to-internal forwarding rules.",
+    ],
+    "Industrial Control Exposure": [
+        "Immediately isolate the device on a dedicated OT VLAN with no direct internet routing.",
+        "Block TCP port 502 (Modbus) and UDP port 47808 (BACnet) at all IT/OT boundary firewalls.",
+        "Apply the NIST ICS Security Guide (SP 800-82r2): enforce unidirectional data diodes between IT and OT segments.",
+        "Audit all Modbus register reads/writes via an IDS (e.g., Claroty, Dragos) for unauthorized commands.",
+        "If device cannot be patched, deploy a Modbus-aware application firewall (e.g., Tofino Xenon) in front of it.",
+    ],
+    "Backdoor Access": [
+        "Update device firmware to the latest version to close known backdoor endpoints.",
+        "Block all management ports (80, 443, 8000, 8080) from untrusted network segments.",
+        "Change all credentials immediately — factory defaults are hardcoded in exploit toolkits.",
+        "Enable audit logging and forward logs to a SIEM for anomalous configuration-change detection.",
+    ],
+    "Remote Code Execution": [
+        "Patch or replace the device immediately — RCE with no authentication has zero acceptable residual risk.",
+        "Block the exploited service port at the firewall while the patch is applied.",
+        "Check for indicators of compromise: unexpected processes, outbound connections on non-standard ports.",
+        "Restore from a known-good backup if compromise is suspected.",
+    ],
+    "Credential Leak": [
+        "Change all device passwords immediately using strong, unique credentials (≥16 chars, mixed case + symbols).",
+        "Enable account lockout after 5 failed attempts where supported.",
+        "Audit active sessions and terminate any unknown logins.",
+        "Segment the device to restrict credential replay attacks to a limited blast radius.",
+    ],
+    "Information Leak": [
+        "Disable unauthenticated ONVIF discovery if not required: device web UI → Network → ONVIF → Disable or require authentication.",
+        "Block UDP port 3702 (WS-Discovery) and multicast group 239.255.255.250 at the VLAN boundary.",
+        "Disable SSDP if not required: block UDP port 1900 at the local switch.",
+    ],
+    "DEFAULT_CREDS_FOUND": [
+        "Change default credentials immediately: access the device web UI and navigate to System → Account → Administrator.",
+        "Set a password meeting complexity requirements: ≥12 chars, mixed case, numbers, symbols.",
+        "Disable or rename the default 'admin' account where the device firmware supports it.",
+        "Enable login attempt rate-limiting or account lockout (typically under Security → Authentication).",
+        "Rotate credentials on all devices of the same model — default credentials are per-model, not per-device.",
+    ],
+}
+
+
+def _attach_remediation(finding: Dict) -> Dict:
+    """Add a remediation list to a single finding dict. Mutates in-place and returns it."""
+    cve = (finding.get("cve") or "").upper()
+    ftype = finding.get("type", "")
+    steps = (
+        REMEDIATION_DB.get(cve)
+        or REMEDIATION_DB.get(ftype)
+        or ["No specific remediation playbook available. Follow vendor security advisories and apply the principle of least privilege."]
+    )
+    finding.setdefault("remediation", steps)
+    return finding
 
 class AuditEngine:
     def __init__(self):
@@ -136,6 +266,48 @@ class AuditEngine:
         if kev_hits:
             risk_score = min(risk_score + 15, 100)
             action = "quarantine"
+
+        # ── LAYER 7: EPSS scoring ───────────────────────────────────────────
+        # Enrich every finding with EPSS probability and boosted priority_score
+        vulnerabilities = _epss.enrich_findings(vulnerabilities)
+        # If any CVE has EPSS ≥ 0.5, escalate action to quarantine
+        high_epss = [v for v in vulnerabilities if v.get("epss", 0.0) >= 0.5]
+        if high_epss:
+            risk_score = min(risk_score + 10, 100)
+            action = "quarantine"
+            logger.warning(
+                f"⚡ {len(high_epss)} high-EPSS CVE(s) on {ip} — escalating to quarantine"
+            )
+
+        # ── LAYER 6: RTSP Unauthenticated Stream Probe ────────────────────────
+        if 554 in ports or 8554 in ports:
+            try:
+                from sin.scanner.rtsp_probe import rtsp_probe
+                rtsp_port = 554 if 554 in ports else 8554
+                rtsp_finding = rtsp_probe.probe(ip, rtsp_port, vendor=mfr)
+                if rtsp_finding:
+                    rtsp_finding.setdefault("epss", 0.0)
+                    rtsp_finding.setdefault("priority_score", 0.0)
+                    vulnerabilities.append(rtsp_finding)
+                    risk_score = min(risk_score + 20, 100)
+                    action = "quarantine"
+                    logger.warning(f"📹 RTSP OPEN on {ip}:{rtsp_port} — unauthenticated stream confirmed")
+            except Exception as e:
+                logger.debug(f"RTSP probe error for {ip}: {e}")
+
+        # ── LAYER 9: Default credential check ───────────────────────────────
+        try:
+            cred_finding = _creds.check(device_data)
+            if cred_finding:
+                vulnerabilities.append(cred_finding)
+                risk_score = min(risk_score + 30, 100)
+                action = "quarantine"
+                logger.warning(f"🔑 DEFAULT_CREDS_FOUND on {ip} — quarantine escalated")
+        except Exception as e:
+            logger.debug(f"Cred check error for {ip}: {e}")
+
+        # ── LAYER 8: Remediation roadmap ────────────────────────────────────
+        vulnerabilities = [_attach_remediation(v) for v in vulnerabilities]
 
         logger.info(f"✅ Brain Decision for {ip} | Risk: {risk_score} | Action: {action} | KEV hits: {len(kev_hits)}")
         return vulnerabilities, risk_score, action

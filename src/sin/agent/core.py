@@ -1,7 +1,8 @@
 """
 sin.agent.core
 ══════════════
-The autonomous SIN agent.  Runs as a persistent asyncio loop.
+The autonomous SIN agent.
+Runs as a persistent asyncio loop.
 On Raspberry Pi: launched via systemd (sin-agent.service).
 On dev:          python -m sin.agent.core
 
@@ -45,7 +46,7 @@ from sin.agent.decision import DecisionEngine, ThreatVerdict
 from sin.agent.mitigation import MitigationEngine
 from sin.agent.packet import PacketEngine
 from sin.agent.notify import NotificationRouter
-from sin.storage.registry import DeviceRegistry   # SQLite asset store (see note below)
+from sin.storage.registry import DeviceRegistry   # SQLite asset store
 
 logger = get_logger("sin.agent.core")
 
@@ -79,7 +80,8 @@ class AgentEvent:
 # ── Main agent ────────────────────────────────────────────────────────────────
 class SINAgent:
     """
-    Single instance per deployment.  Instantiate once and call run().
+    Single instance per deployment.
+    Instantiate once and call run().
 
     Configuration (via sin.core.config.agent_settings):
         SCAN_INTERVAL_SEC   – seconds between full subnet scans  (default 300)
@@ -116,7 +118,7 @@ class SINAgent:
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def run(self) -> None:
-        """Start all agent tasks.  Runs until SIGTERM/SIGINT."""
+        """Start all agent tasks. Runs until SIGTERM/SIGINT."""
         self._running = True
         self._setup_signal_handlers()
 
@@ -195,7 +197,13 @@ class SINAgent:
         # Detect devices that have disappeared since last scan
         await self._check_gone_devices(subnet, results)
 
+        # ── NEW: Bulk Database Upsert ──
+        # Process the entire batch of hosts in one DB transaction
+        is_new_map = self.registry.bulk_process(results)
+
         for host in results:
+            # Inject the is_new flag so _process_host doesn't need to query the DB
+            host["_is_new"] = is_new_map.get(host["ip_address"], False)
             await self._process_host(host, session_id)
 
         await self._emit(EventKind.SCAN_COMPLETE, {
@@ -210,9 +218,8 @@ class SINAgent:
         # Merge packet anomaly signals into host dict before decision
         host["_packet_signals"] = self._packet_signals.get(ip, [])
 
-        # Registry: is this a new or updated device?
-        is_new = not self.registry.exists(ip)
-        self.registry.upsert(host)
+        # Read the flag injected during the bulk upsert
+        is_new = host.pop("_is_new", False)
 
         kind = EventKind.DEVICE_NEW if is_new else EventKind.DEVICE_UPDATED
         await self._emit(kind, {"ip": ip, "session_id": session_id,
@@ -390,7 +397,7 @@ class SINAgent:
         return result
 
     def trigger_scan(self, subnet: Optional[str] = None) -> str:
-        """Queue an immediate scan.  Returns session_id."""
+        """Queue an immediate scan. Returns session_id."""
         session_id = str(uuid.uuid4())[:8].upper()
         targets = [subnet] if subnet else agent_settings.SUBNETS
         for s in targets:

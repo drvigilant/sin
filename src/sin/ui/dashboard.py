@@ -1,905 +1,479 @@
-"""
-SIN Enterprise Dashboard  v3
-Dark / Light theme toggle · Analytics · Alerts · Live Asset Table
-"""
 import streamlit as st
 import streamlit.components.v1 as components
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import requests, time, os, json, math
+import os
 
-from sin.response.report import generate_pdf_report
-
-API_URL = os.getenv("SIN_API_URL", "http://localhost:8000")
+# --- AUTH & CONFIG ---
+# These are used by your Windows browser to talk to the API
+API_URL = "http://127.0.0.1:8000"
+API_KEY = os.getenv("SIN_API_KEY", "a634fd2d20eb8dd013eab32bdbf9529694abb5e46a35dd92d531faf34f1f0291")
 
 st.set_page_config(
     page_title="SIN — Shadows In The Network",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ── Theme state ───────────────────────────────────────────────────────────────
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "overview"
-
-T = st.session_state.theme
-IS_DARK = T == "dark"
-
-# ── Theme tokens ──────────────────────────────────────────────────────────────
-THEME = {
-    "dark": {
-        "bg":         "#0F1318",
-        "bg2":        "#161C26",
-        "bg3":        "#1E2535",
-        "border":     "rgba(255,255,255,0.06)",
-        "t1":         "#FFFFFF",
-        "t2":         "#A0AABB",
-        "t3":         "#556070",
-        "sidebar_bg": "#0A0D12",
-        "card_bg":    "#161C26",
-        "plotly_bg":  "#161C26",
-        "plotly_paper":"#0F1318",
-        "plotly_font":"#A0AABB",
-        "plotly_grid":"rgba(255,255,255,0.05)",
-    },
-    "light": {
-        "bg":         "#F0F2F5",
-        "bg2":        "#FFFFFF",
-        "bg3":        "#E8EBF0",
-        "border":     "rgba(0,0,0,0.07)",
-        "t1":         "#0D1117",
-        "t2":         "#4A5568",
-        "t3":         "#8B9DB0",
-        "sidebar_bg": "#FFFFFF",
-        "card_bg":    "#FFFFFF",
-        "plotly_bg":  "#FFFFFF",
-        "plotly_paper":"#F0F2F5",
-        "plotly_font":"#4A5568",
-        "plotly_grid":"rgba(0,0,0,0.06)",
-    },
-}[T]
-
-ACCENT = "#00AAFF"
-DANGER = "#FF4757"
-WARN   = "#FFA502"
-SAFE   = "#2ED573"
-
-# ── Global CSS ────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-
-*{{box-sizing:border-box;}}
-:root{{
-  --bg:{THEME['bg']};--bg2:{THEME['bg2']};--bg3:{THEME['bg3']};
-  --border:{THEME['border']};--t1:{THEME['t1']};--t2:{THEME['t2']};--t3:{THEME['t3']};
-  --accent:{ACCENT};--danger:{DANGER};--warn:{WARN};--safe:{SAFE};
-  --mono:'IBM Plex Mono',monospace;--sans:'DM Sans',sans-serif;
-}}
-#MainMenu,footer{{visibility:hidden;height:0;}}
-[data-testid="stHeader"],[data-testid="stDecoration"],.stDeployButton{{display:none!important;}}
-[data-testid="stAppViewContainer"],.stApp{{background:var(--bg)!important;font-family:var(--sans)!important;}}
-.main .block-container{{padding:1.4rem 2rem 3rem!important;max-width:100%!important;}}
-[data-testid="stSidebar"]{{background:{THEME['sidebar_bg']}!important;
-  border-right:1px solid var(--border)!important;min-width:220px!important;max-width:220px!important;}}
-[data-testid="stSidebarContent"]{{padding:0!important;}}
-section[data-testid="stSidebar"]>div:first-child{{padding:0!important;}}
-[data-testid="stSidebar"] .stButton>button{{
-  background:transparent!important;border:1px solid var(--border)!important;
-  color:var(--t2)!important;font-family:var(--sans)!important;font-size:12px!important;
-  width:100%!important;text-align:left!important;padding:7px 14px!important;
-  border-radius:6px!important;margin-bottom:4px!important;transition:all 0.15s!important;}}
-[data-testid="stSidebar"] .stButton>button:hover{{
-  background:var(--bg3)!important;color:var(--t1)!important;
-  border-color:rgba(0,170,255,0.3)!important;}}
-[data-testid="stSidebar"] .stDownloadButton>button{{
-  background:rgba(0,170,255,0.1)!important;border:1px solid rgba(0,170,255,0.3)!important;
-  color:{ACCENT}!important;font-family:var(--sans)!important;font-size:12px!important;
-  width:100%!important;padding:7px 14px!important;border-radius:6px!important;margin-top:4px!important;}}
-hr{{border-color:var(--border)!important;margin:0!important;}}
-.stSpinner>div{{border-top-color:{ACCENT}!important;}}
-[data-testid="stSidebar"] [data-testid="stAlert"]{{
-  background:var(--bg2)!important;border:1px solid var(--border)!important;
-  font-family:var(--sans)!important;font-size:11px!important;
-  padding:7px 10px!important;border-radius:5px!important;margin-top:5px!important;}}
-[data-testid="element-container"] .stPlotlyChart{{background:transparent!important;}}
-</style>
-""", unsafe_allow_html=True)
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def fetch_stats():
-    try:
-        r = requests.get(f"{API_URL}/stats", timeout=5)
-        return r.json() if r.status_code == 200 else None
-    except Exception: return None
-
-def fetch_devices():
-    try:
-        r = requests.get(f"{API_URL}/devices", timeout=5)
-        return pd.DataFrame(r.json()) if r.status_code == 200 else pd.DataFrame()
-    except Exception: return pd.DataFrame()
-
-def plotly_defaults():
-    return dict(
-        paper_bgcolor=THEME["plotly_paper"],
-        plot_bgcolor=THEME["plotly_bg"],
-        font=dict(family="DM Sans", color=THEME["plotly_font"], size=11),
-        margin=dict(l=12, r=12, t=28, b=12),
-    )
-
-
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-pulse_color = DANGER if IS_DARK else DANGER
-text_color  = THEME["t1"]
-
-with st.sidebar:
-    st.markdown(f"""
+# Hide Streamlit UI elements for a professional SOC look
+st.markdown("""
     <style>
-    @keyframes sinblink{{
-      0%,100%{{opacity:1;box-shadow:0 0 7px {DANGER},0 0 14px rgba(255,71,87,.4)}}
-      50%{{opacity:.4;box-shadow:0 0 2px {DANGER}}}
-    }}
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .block-container {padding: 0px !important; max-width: 100% !important;}
+        iframe {border: none;}
     </style>
-    <div style="padding:20px 16px 14px;border-bottom:1px solid {THEME['border']};">
-      <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px;">
-        <div style="width:7px;height:7px;border-radius:50%;background:{DANGER};
-                    animation:sinblink 2.2s ease-in-out infinite;flex-shrink:0;"></div>
-        <span style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;
-                     color:{THEME['t1']};letter-spacing:.08em;">SIN</span>
-      </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:{THEME['t3']};
-                  letter-spacing:.16em;text-transform:uppercase;padding-left:16px;">
-        Shadows In The Network
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Nav
-    nav_items = [
-        ("overview",  "Dashboard",      "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"),
-        ("analytics", "Analytics",      "M18 20V10M12 20V4M6 20v-6"),
-        ("alerts",    "Alerts",         "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"),
-        ("assets",    "Assets",         "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"),
-        ("reports",   "Reports",        "M22 12h-4l-3 9L9 3l-3 9H2"),
-        ("settings",  "Settings",       "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"),
-    ]
-    st.markdown(f'<div style="padding:10px 0 6px;">', unsafe_allow_html=True)
-    for tab_id, label, path in nav_items:
-        active = st.session_state.active_tab == tab_id
-        bg     = f"rgba(0,170,255,.08)" if active else "transparent"
-        border = f"border-right:2px solid {ACCENT};" if active else ""
-        clr    = ACCENT if active else THEME["t2"]
-        icon_fill = "#00AAFF" if active else ("#A0AABB" if IS_DARK else "#4A5568")
-        icon_bg   = (f"background:{ACCENT};" if active else
-                     f"background:{'#1E2535' if IS_DARK else '#EEF0F4'};")
-        disabled_style = "" if tab_id in ("overview","analytics","alerts") else "opacity:.4;"
-        st.markdown(f"""
-        <div style="padding:7px 16px;display:flex;align-items:center;gap:10px;
-                    background:{bg};{border}margin-bottom:2px;{disabled_style}
-                    cursor:{'pointer' if tab_id in ('overview','analytics','alerts') else 'default'};"
-             {'onclick="window.parent.postMessage({type:\'streamlit:setComponentValue\',value:\''+tab_id+'\'}, \'*\')"' if tab_id in ('overview','analytics','alerts') else ''}>
-          <div style="width:28px;height:28px;border-radius:7px;{icon_bg}
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                 stroke="{'#fff' if active else icon_fill}" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="{path}"/>
-            </svg>
-          </div>
-          <span style="font-family:'DM Sans',sans-serif;font-size:13px;
-                       color:{clr};font-weight:{'600' if active else '400'};">{label}</span>
-        </div>""", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<hr>', unsafe_allow_html=True)
-
-    # Theme toggle
-    st.markdown(f"""
-    <div style="padding:10px 16px 4px;">
-      <span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;
-                   color:{THEME['t3']};text-transform:uppercase;letter-spacing:.14em;">
-        Appearance
-      </span>
-    </div>""", unsafe_allow_html=True)
-    theme_label = "☀️  Light Mode" if IS_DARK else "🌙  Dark Mode"
-    if st.button(theme_label):
-        st.session_state.theme = "light" if IS_DARK else "dark"
-        st.rerun()
-
-    st.markdown(f"""
-    <div style="padding:10px 16px 4px;margin-top:6px;">
-      <span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;
-                   color:{THEME['t3']};text-transform:uppercase;letter-spacing:.14em;">Actions</span>
-    </div>""", unsafe_allow_html=True)
-    if st.button("⟳  Refresh Data"):
-        st.rerun()
-
-    st.markdown(f"""
-    <div style="padding:10px 16px 4px;">
-      <span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;
-                   color:{THEME['t3']};text-transform:uppercase;letter-spacing:.14em;">Audit Reports</span>
-    </div>""", unsafe_allow_html=True)
-    if st.button("↓  Generate PDF Report"):
-        with st.spinner("Generating…"):
-            df_pdf = fetch_devices()
-            if not df_pdf.empty:
-                path = generate_pdf_report(df_pdf.to_dict("records"))
-                with open(path,"rb") as f: pdf_bytes = f.read()
-                st.download_button("⬇  Download Audit PDF", pdf_bytes,
-                                   "sin_security_audit.pdf","application/pdf")
-                st.success("Report ready.")
-            else:
-                st.error("No device data.")
-
-    # Tab switcher buttons (real Streamlit)
-    st.markdown('<hr>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div style="padding:10px 16px 4px;">
-      <span style="font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;
-                   color:{THEME['t3']};text-transform:uppercase;letter-spacing:.14em;">Navigation</span>
-    </div>""", unsafe_allow_html=True)
-    if st.button("📊  Overview"):      st.session_state.active_tab = "overview";  st.rerun()
-    if st.button("📈  Analytics"):     st.session_state.active_tab = "analytics"; st.rerun()
-    if st.button("🔔  Alerts"):        st.session_state.active_tab = "alerts";    st.rerun()
-
-    st.markdown(f"""
-    <div style="position:fixed;bottom:0;width:218px;padding:12px 16px;
-                border-top:1px solid {THEME['border']};background:{THEME['sidebar_bg']};">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-        <div style="width:6px;height:6px;border-radius:50%;background:{SAFE};box-shadow:0 0 6px {SAFE};"></div>
-        <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:{SAFE};font-weight:500;">System Online</span>
-      </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:{THEME['t3']};word-break:break-all;">{API_URL}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ── Data fetch ────────────────────────────────────────────────────────────────
-stats      = fetch_stats()
-df         = fetch_devices()
-now_ts     = time.strftime("%H:%M:%S")
-session_id = time.strftime("%Y%m%d-%H%M%S")
-
-# Derived counts
-total = 0; vuln_count = 0; crit_count = 0; clean_count = 0
-all_vulns = []
-if stats:
-    total = stats.get("total_assets_tracked", 0)
-if not df.empty:
-    total = total or len(df)
-    for _, row in df.iterrows():
-        vulns = row.get("vulnerabilities", [])
-        if not isinstance(vulns, list): vulns = []
-        if vulns:
-            vuln_count += 1
-            for v in vulns:
-                v_copy = dict(v)
-                v_copy["ip"] = row.get("ip_address","")
-                v_copy["hostname"] = row.get("hostname","")
-                v_copy["manufacturer"] = row.get("manufacturer","")
-                all_vulns.append(v_copy)
-            if any(v.get("severity","").upper()=="CRITICAL" for v in vulns):
-                crit_count += 1
-        else:
-            clean_count += 1
-all_vulns.sort(key=lambda x: {"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}.get(x.get("severity",""),9))
-
-# ── Page header ───────────────────────────────────────────────────────────────
-tab_labels = {"overview":"Security Overview","analytics":"Network Analytics","alerts":"Security Alerts"}
-st.markdown(f"""
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-  <div>
-    <h1 style="font-family:'DM Sans',sans-serif;font-size:24px;font-weight:700;
-               color:{THEME['t1']};margin:0 0 4px;letter-spacing:-.02em;">
-      {tab_labels.get(st.session_state.active_tab,'Security Overview')}
-    </h1>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{THEME['t3']};letter-spacing:.05em;">
-      SESSION&nbsp;·&nbsp;{session_id}&nbsp;·&nbsp;{now_ts}
-    </div>
-  </div>
-  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;
-              color:{THEME['t3']};background:{THEME['bg2']};
-              border:1px solid {THEME['border']};padding:6px 12px;border-radius:6px;">
-    {'🌙 DARK' if IS_DARK else '☀️ LIGHT'} THEME
-  </div>
-</div>
 """, unsafe_allow_html=True)
 
-# ── Metric cards (always shown) ───────────────────────────────────────────────
-def card(label, value, val_color=None, border=None, icon=None):
-    vc = val_color or THEME["t1"]
-    bc = border or THEME["border"]
-    return f"""
-    <div style="background:{THEME['card_bg']};border:1px solid {bc};border-radius:10px;
-                padding:18px 20px;position:relative;overflow:hidden;">
-      <div style="font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;
-                  text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-        {label}
-      </div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:34px;font-weight:700;
-                  color:{vc};line-height:1;">{value}</div>
-    </div>"""
-
-if not df.empty or stats:
-    c1,c2,c3,c4 = st.columns(4)
-    with c1: st.markdown(card("Total Assets",total), unsafe_allow_html=True)
-    with c2: st.markdown(card("Vulnerable",vuln_count,DANGER,"rgba(255,71,87,.2)"), unsafe_allow_html=True)
-    with c3: st.markdown(card("Critical",crit_count,DANGER,"rgba(255,71,87,.2)"), unsafe_allow_html=True)
-    with c4: st.markdown(card("Clean",clean_count,SAFE,"rgba(46,213,115,.18)"), unsafe_allow_html=True)
-else:
-    st.markdown(f"""
-    <div style="background:rgba(255,71,87,.07);border:1px solid rgba(255,71,87,.25);
-                border-radius:8px;padding:13px 18px;color:{DANGER};font-size:13px;">
-      ⚠ API Offline — run:
-      <code style="background:rgba(255,71,87,.12);padding:2px 7px;border-radius:3px;
-                   font-family:'IBM Plex Mono',monospace;font-size:11px;">
-        uvicorn sin.api.server:app
-      </code>
-    </div>""", unsafe_allow_html=True)
-
-st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════════
-if st.session_state.active_tab == "overview":
-    if not df.empty:
-        records = df.fillna("").to_dict("records")
-        for d in records:
-            for k in ("open_ports","vulnerabilities","os_cpe","protocol_hints"):
-                if not isinstance(d.get(k), list): d[k] = []
-            if not isinstance(d.get("services"),dict): d["services"] = {}
-            if not isinstance(d.get("service_versions"),dict): d["service_versions"] = {}
-
-        devs_js    = json.dumps(records)
-        vendors_js = json.dumps(sorted({d.get("manufacturer") or "Unknown" for d in records}))
-
-        bg       = THEME['bg']
-        bg2      = THEME['bg2']
-        bg3      = THEME['bg3']
-        t1       = THEME['t1']
-        t2       = THEME['t2']
-        t3       = THEME['t3']
-        border   = THEME['border']
-
-        TABLE_HTML = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+# --- VETERAN HTML (Standard string to avoid SyntaxErrors) ---
+# We use REPLACE_API_URL and REPLACE_API_KEY as placeholders
+RAW_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIN — Shadows In The Network</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-*{{box-sizing:border-box;margin:0;padding:0;}}
-body{{background:{bg};font-family:'DM Sans',sans-serif;color:{t1};
-      padding:2px 1px 16px;-webkit-font-smoothing:antialiased;}}
-.fbar{{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}}
-.fbar input,.fbar select{{
-  background:{bg2};border:1px solid {border};color:{t1};
-  font-family:'DM Sans',sans-serif;font-size:12px;padding:8px 12px;
-  border-radius:7px;outline:none;transition:border-color .15s,background .15s;}}
-.fbar input{{flex:1;min-width:220px;}}
-.fbar input::placeholder{{color:{t3};}}
-.fbar input:focus,.fbar select:focus{{border-color:rgba(0,170,255,.4);background:{bg3};color:{t1};}}
-.fbar select{{color:{t2};cursor:pointer;min-width:120px;}}
-.slbl{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:{t3};margin-bottom:10px;}}
-.tbl{{width:100%;border-collapse:collapse;background:{bg2};
-      border:1px solid {border};border-radius:10px;overflow:hidden;}}
-.tbl thead tr{{border-bottom:1px solid {border};}}
-.tbl th{{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;
-         color:{t3};padding:12px 14px;text-align:left;cursor:pointer;
-         user-select:none;white-space:nowrap;transition:color .15s;}}
-.tbl th:hover{{color:{t2};}}
-.tbl th.sorted{{color:#00AAFF;}}
-.si{{margin-left:3px;opacity:.35;}}
-.sorted .si{{opacity:1;}}
-.tbl tr.dr{{border-bottom:1px solid {'rgba(255,255,255,.04)' if IS_DARK else 'rgba(0,0,0,.04)'};
-            cursor:pointer;transition:background .1s;
-            opacity:0;animation:rowIn .24s ease forwards;}}
-.tbl tr.dr:hover{{background:{bg3};}}
-.tbl tr.dr.xopen{{background:{bg3};border-bottom:none;}}
-.tbl td{{padding:11px 14px;vertical-align:middle;font-size:12.5px;color:{t1};}}
-.ip{{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#4FC3F7;font-weight:500;}}
-.mac{{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{t2};}}
-.osfam{{color:{t2};font-size:11.5px;}}
-.ports{{display:flex;flex-wrap:wrap;gap:3px;}}
-.pb{{font-family:'IBM Plex Mono',monospace;font-size:9.5px;
-     background:rgba(0,170,255,.1);border:1px solid rgba(0,170,255,.22);
-     color:#4FC3F7;padding:2px 6px;border-radius:4px;}}
-.dib{{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}}
-.di-cam{{background:linear-gradient(135deg,#0066CC,#00AAFF);}}
-.di-nvr{{background:linear-gradient(135deg,#6A0DAD,#9B59B6);}}
-.di-rtr{{background:linear-gradient(135deg,#CC5500,#FF8C00);}}
-.di-ws {{background:linear-gradient(135deg,#1E8449,#2ED573);}}
-.di-srv{{background:linear-gradient(135deg,#1A5276,#2E86C1);}}
-.di-iot{{background:linear-gradient(135deg,#7D6608,#F0B90B);}}
-.di-prt{{background:linear-gradient(135deg,#633974,#AF7AC5);}}
-.di-unk{{background:linear-gradient(135deg,#2C3E50,#4A5568);}}
-.dcell{{display:flex;align-items:center;gap:9px;}}
-.dlbl{{font-size:12px;color:{t2};max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
-.badge{{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;
-        font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;}}
-.bc{{background:rgba(255,71,87,.15);color:#FF4757;border:1px solid rgba(255,71,87,.3);}}
-.bh{{background:rgba(255,165,2,.14);color:#FFA502;border:1px solid rgba(255,165,2,.28);}}
-.bm{{background:rgba(0,170,255,.14);color:#00AAFF;border:1px solid rgba(0,170,255,.28);}}
-.bl{{background:rgba(46,213,115,.12);color:#2ED573;border:1px solid rgba(46,213,115,.25);}}
-.bk{{background:rgba(46,213,115,.1);color:#2ED573;border:1px solid rgba(46,213,115,.2);}}
-.expind{{width:18px;height:18px;border-radius:4px;background:{'rgba(255,255,255,.06)' if IS_DARK else 'rgba(0,0,0,.06)'};
-         display:flex;align-items:center;justify-content:center;
-         transition:transform .2s ease,background .15s;flex-shrink:0;}}
-.dr.xopen .expind{{transform:rotate(90deg);background:rgba(0,170,255,.15);}}
-tr.xr td{{padding:0;}}
-.xpanel{{display:none;overflow:hidden;max-height:0;opacity:0;
-         transition:max-height .22s ease,opacity .18s ease;
-         background:{'#0F1318' if IS_DARK else '#F7F9FC'};
-         border-top:1px solid rgba(0,170,255,.18);border-bottom:1px solid {border};}}
-.xpanel.open{{display:flex;max-height:700px;opacity:1;padding:18px 20px;gap:24px;flex-wrap:wrap;}}
-.xf{{flex:1;min-width:240px;}} .xv{{flex:1.4;min-width:280px;}}
-.xdt{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;
-      color:{t3};margin-bottom:12px;padding-bottom:6px;
-      border-bottom:1px solid {'rgba(255,255,255,.05)' if IS_DARK else 'rgba(0,0,0,.06)'};}}
-.kv{{display:flex;margin-bottom:6px;align-items:flex-start;font-size:11.5px;}}
-.kk{{color:{t3};min-width:130px;flex-shrink:0;padding-right:8px;}}
-.kv2{{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{t1};word-break:break-all;line-height:1.5;}}
-.kv2.dim{{color:{t2};font-family:'DM Sans',sans-serif;font-size:11.5px;}}
-.vi{{margin-bottom:8px;padding:10px 12px;background:{bg2};border-radius:6px;border-left:3px solid;}}
-.vi-c{{border-color:#FF4757;}} .vi-h{{border-color:#FFA502;}}
-.vi-m{{border-color:#00AAFF;}} .vi-l{{border-color:#2ED573;}}
-.vhdr{{display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap;}}
-.vcve{{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:{t3};
-       background:{'rgba(255,255,255,.04)' if IS_DARK else 'rgba(0,0,0,.04)'};padding:2px 6px;border-radius:3px;}}
-.vdesc{{font-size:11px;color:{t2};line-height:1.6;}}
-.no-v{{display:flex;align-items:center;gap:7px;color:#2ED573;font-size:12px;}}
-.smbadge{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-          padding:2px 7px;border-radius:4px;display:inline-block;}}
-.sm-nmap{{background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.25);color:#2ED573;}}
-.sm-native{{background:{'rgba(160,170,187,.08)' if IS_DARK else 'rgba(0,0,0,.06)'};
-            border:1px solid {'rgba(160,170,187,.15)' if IS_DARK else 'rgba(0,0,0,.1)'};color:{t2};}}
-.empty{{text-align:center;padding:52px;color:{t3};font-size:13px;}}
-@keyframes rowIn{{from{{opacity:0;transform:translateY(4px)}}to{{opacity:1;transform:translateY(0)}}}}
-</style></head><body>
-<div class="fbar">
-  <input id="srch" type="text" placeholder="Search IP, hostname, MAC, vendor, OS…" oninput="go()">
-  <select id="sevF" onchange="go()">
-    <option value="">All Severity</option>
-    <option value="CRITICAL">Critical</option>
-    <option value="HIGH">High</option>
-    <option value="MEDIUM">Medium</option>
-    <option value="LOW">Low</option>
-    <option value="CLEAN">Clean</option>
-  </select>
-  <select id="typeF" onchange="go()">
-    <option value="">All Types</option>
-    <option value="camera">Camera</option>
-    <option value="nvr_dvr">NVR / DVR</option>
-    <option value="router">Router</option>
-    <option value="workstation">Workstation</option>
-    <option value="server">Server</option>
-    <option value="iot">IoT</option>
-    <option value="unknown">Unknown</option>
-  </select>
-  <select id="venF" onchange="go()"></select>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0b0e14;--surface:#111520;--surface2:#181d2e;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#e2e8f0;--muted:#64748b;--dim:#2d3748;
+  --accent:#3b82f6;--accent-dim:rgba(59,130,246,0.12);
+  --red:#ef4444;--red-dim:rgba(239,68,68,0.12);
+  --orange:#f97316;--orange-dim:rgba(249,115,22,0.12);
+  --green:#22c55e;--green-dim:rgba(34,197,94,0.12);
+  --yellow:#eab308;--yellow-dim:rgba(234,179,8,0.12);
+  --mono:'IBM Plex Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow:hidden;}
+.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.logo-mark{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+.logo-text{font-size:15px;font-weight:500;letter-spacing:.12em;color:var(--text);}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:.06em;font-family:var(--mono);}
+.sidebar-nav{padding:12px 8px;flex:1;}
+.nav-section{font-size:9px;font-weight:500;letter-spacing:.1em;color:var(--muted);padding:16px 12px 6px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:var(--sans);}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border);}
+.status-chip{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--green-dim);border-radius:8px;border:1px solid rgba(34,197,94,0.2);}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+.status-text{font-size:11px;color:var(--green);font-weight:500;}
+.ai-chip{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);margin-top:8px;font-size:10px;color:var(--muted);}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);}
+.ai-dot.online{background:var(--accent);}
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.topbar-title{font-size:14px;font-weight:500;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.last-updated{font-size:11px;color:var(--muted);font-family:var(--mono);}
+.scanning-indicator{font-size:11px;color:var(--yellow);font-family:var(--mono);display:none;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.scan-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--accent);border-radius:8px;border:none;color:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);transition:opacity .15s;}
+.scan-btn:hover{opacity:.85;}
+.scan-btn:disabled{opacity:.5;cursor:not-allowed;}
+.subnet-input{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12px;font-family:var(--mono);width:130px;}
+.subnet-input:focus{outline:none;border-color:var(--accent);}
+.content{flex:1;overflow-y:auto;padding:24px;}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;}
+.metric-label{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.metric-value{font-size:28px;font-weight:300;font-family:var(--mono);color:var(--text);line-height:1;}
+.metric-value.red{color:var(--red);}
+.metric-value.green{color:var(--green);}
+.metric-value.orange{color:var(--orange);}
+.metric-sub{font-size:10px;color:var(--muted);margin-top:6px;font-family:var(--mono);}
+.panels{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-bottom:24px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+.panel-title{font-size:12px;font-weight:500;letter-spacing:.04em;}
+.panel-badge{font-size:10px;font-family:var(--mono);color:var(--muted);background:var(--surface2);padding:3px 8px;border-radius:20px;}
+.toolbar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.search-wrap{flex:1;position:relative;}
+.search-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px 7px 32px;color:var(--text);font-size:12px;font-family:var(--sans);}
+.search-input:focus{outline:none;border-color:var(--accent);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);width:14px;height:14px;}
+.filter-select{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:var(--muted);font-size:12px;font-family:var(--sans);cursor:pointer;}
+table{width:100%;border-collapse:collapse;}
+thead th{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody tr.selected{background:rgba(59,130,246,0.06);border-left:2px solid var(--accent);}
+tbody td{padding:11px 14px;font-size:12px;}
+.td-ip{font-family:var(--mono);font-size:11px;color:var(--accent);}
+.td-mono{font-family:var(--mono);font-size:11px;color:var(--muted);}
+.device-icon{width:28px;height:28px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.icon-camera{background:rgba(239,68,68,0.15);}
+.icon-router{background:rgba(34,197,94,0.15);}
+.icon-pc{background:rgba(59,130,246,0.15);}
+.icon-iot{background:rgba(234,179,8,0.15);}
+.icon-unknown{background:var(--surface2);}
+.vendor-cell{display:flex;align-items:center;gap:8px;}
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;font-family:var(--mono);}
+.badge-critical{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+.badge-high{background:var(--orange-dim);color:var(--orange);border:1px solid rgba(249,115,22,0.2);}
+.badge-medium{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(59,130,246,0.2);}
+.badge-low{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,0.2);}
+.badge-clean{background:var(--surface2);color:var(--muted);border:1px solid var(--border2);}
+.port-tag{display:inline-block;font-size:10px;font-family:var(--mono);background:var(--surface2);color:var(--muted);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;margin:1px;}
+.detail-row{display:none;}
+.detail-row.open{display:table-row;}
+.detail-inner{padding:16px 18px;background:rgba(59,130,246,0.03);display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.detail-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.detail-card h4{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11.5px;}
+.kv:last-child{border:none;}
+.kv-key{color:var(--muted);}
+.kv-val{font-family:var(--mono);font-size:11px;text-align:right;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+.vuln-item{padding:8px 10px;border-radius:8px;margin-bottom:6px;border:1px solid var(--border);border-left:3px solid var(--muted);}
+.vuln-item.CRITICAL{border-left-color:var(--red);}
+.vuln-item.HIGH{border-left-color:var(--orange);}
+.vuln-item.MEDIUM{border-left-color:var(--accent);}
+.vuln-item.LOW{border-left-color:var(--green);}
+.vuln-type{font-size:11.5px;font-weight:500;margin-bottom:3px;}
+.vuln-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.vuln-cve{font-size:10px;font-family:var(--mono);color:var(--accent);margin-top:3px;}
+.ai-audit-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:6px;color:var(--accent);font-size:11px;cursor:pointer;font-family:var(--sans);margin-top:8px;}
+.ai-audit-btn:hover{background:rgba(59,130,246,0.2);}
+.ai-audit-btn:disabled{opacity:.5;cursor:not-allowed;}
+.ai-result{margin-top:8px;padding:10px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--muted);border:1px solid var(--border);}
+.events-list{max-height:420px;overflow-y:auto;}
+.event-item{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.event-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.event-dot.WARNING{background:var(--orange);}
+.event-dot.CRITICAL{background:var(--red);}
+.event-dot.INFO{background:var(--accent);}
+.event-body{flex:1;min-width:0;}
+.event-ip{font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:2px;}
+.event-desc{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.event-time{font-size:10px;font-family:var(--mono);color:var(--dim);flex-shrink:0;}
+.empty{text-align:center;padding:48px;color:var(--muted);font-size:13px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px;}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;font-size:12px;font-family:var(--mono);z-index:999;display:none;}
+.toast.show{display:block;}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark"><div class="logo-pulse"></div><span class="logo-text">SIN</span></div>
+    <div class="logo-sub">SHADOWS IN THE NETWORK</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">Monitor</div>
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="1.5"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('assets',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke-width="1.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Asset Registry
+    </button>
+    <button class="nav-item" onclick="showPage('threats',this)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke-width="1.5"/><line x1="12" y1="9" x2="12" y2="13" stroke-width="1.5"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-width="1.5"/></svg>
+      Threat Events
+    </button>
+  </div>
+  <div class="sidebar-footer">
+    <div class="status-chip"><div class="status-dot"></div><span class="status-text">System Online</span></div>
+    <div class="ai-chip" id="ai-status-chip">
+      <div class="ai-dot" id="ai-dot"></div>
+      <span id="ai-status-text">Ollama: checking...</span>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="page-title">Dashboard</span>
+    <div class="topbar-right">
+      <span class="scanning-indicator" id="scanning-ind">● SCANNING</span>
+      <span class="last-updated" id="last-updated">–</span>
+      <input class="subnet-input" id="subnet-input" value="192.168.30">
+      <button class="scan-btn" id="scan-btn" onclick="triggerScan()">→ Scan Now</button>
+    </div>
+  </div>
+  <div class="content" id="content"><div class="empty">Loading...</div></div>
 </div>
-<div class="slbl" id="countLbl">Live Asset Inventory</div>
-<table class="tbl">
-<thead><tr>
-  <th style="width:40px;padding-left:12px;"></th>
-  <th onclick="srt('ip_address')">IP Address<span class="si">&#8597;</span></th>
-  <th onclick="srt('mac_address')">MAC Address<span class="si">&#8597;</span></th>
-  <th onclick="srt('hostname')">Hostname<span class="si">&#8597;</span></th>
-  <th onclick="srt('manufacturer')">Device / Vendor<span class="si">&#8597;</span></th>
-  <th onclick="srt('os_family')">OS / Type<span class="si">&#8597;</span></th>
-  <th>Open Ports</th>
-  <th onclick="srt('_risk')">Risk<span class="si">&#8597;</span></th>
-</tr></thead>
-<tbody id="tbody"></tbody>
-</table>
+<div class="toast" id="toast"></div>
+
 <script>
-const DEVS={devs_js};
-const VENS={vendors_js};
-const vf=document.getElementById('venF');
-[['','All Vendors'],...VENS.map(v=>[v,v])].forEach(([val,txt])=>{{
-  const o=document.createElement('option');o.value=val;o.textContent=txt;vf.appendChild(o);
-}});
-let CS={{k:null,asc:true}};
-const ORD={{'CRITICAL':0,'HIGH':1,'MEDIUM':2,'LOW':3,'CLEAN':4}};
-function topSev(v){{
-  if(!v||!v.length)return'CLEAN';
-  for(const s of['CRITICAL','HIGH','MEDIUM','LOW'])
-    if(v.some(x=>(x.severity||'').toUpperCase()===s))return s;
-  return'LOW';
-}}
-function badge(s){{
-  const m={{'CRITICAL':'bc','HIGH':'bh','MEDIUM':'bm','LOW':'bl','CLEAN':'bk'}};
-  return'<span class="badge '+(m[s]||'bk')+'">'+s+'</span>';
-}}
-const ICONS={{
-  camera:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="13" rx="2"/><circle cx="12" cy="13" r="3"/><path d="M16 7l-1.5-3h-5L8 7"/></svg>',
-  nvr_dvr:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-  router:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="1" y="8" width="22" height="8" rx="2"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/><circle cx="14" cy="12" r="1" fill="#fff"/><line x1="6" y1="8" x2="4" y2="5"/><line x1="12" y1="8" x2="12" y2="5"/><line x1="18" y1="8" x2="20" y2="5"/></svg>',
-  workstation:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
-  server:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="18" cy="6" r="1" fill="#fff"/><circle cx="18" cy="18" r="1" fill="#fff"/></svg>',
-  iot:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6a6 6 0 0 1 6 6"/><circle cx="12" cy="12" r="2" fill="#fff" stroke="none"/></svg>',
-  printer:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
-  unknown:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-}};
-const ICLS={{camera:'di-cam',nvr_dvr:'di-nvr',router:'di-rtr',workstation:'di-ws',server:'di-srv',iot:'di-iot',printer:'di-prt',unknown:'di-unk'}};
-function typeIcon(t){{return'<div class="dib '+(ICLS[t]||'di-unk')+'">'+(ICONS[t]||ICONS.unknown)+'</div>';}}
-function portBadges(arr){{
-  if(!arr||!arr.length)return'<span style="color:{t3};font-size:10px;">&#8212;</span>';
-  let h=arr.slice(0,5).map(p=>'<span class="pb">'+p+'</span>').join('');
-  if(arr.length>5)h+='<span class="pb" style="opacity:.45;">+'+(arr.length-5)+'</span>';
-  return'<div class="ports">'+h+'</div>';
-}}
-function detailPanel(d){{
-  const sm=d.scan_method||'native';
-  const rows=[
-    ['IP Address','<span class="kv2">'+(d.ip_address||'&#8212;')+'</span>'],
-    ['MAC Address','<span class="kv2">'+(d.mac_address||'&#8212;')+'</span>'],
-    ['Hostname','<span class="kv2 dim">'+(d.hostname||'&#8212;')+'</span>'],
-    ['Manufacturer','<span class="kv2 dim">'+(d.manufacturer||'&#8212;')+'</span>'],
-    ['OS Family','<span class="kv2 dim">'+(d.os_family||'&#8212;')+'</span>'],
-  ];
-  if(d.os_details)rows.push(['OS Detail','<span class="kv2 dim">'+d.os_details+'</span>']);
-  if(d.os_accuracy>0)rows.push(['OS Accuracy','<span class="kv2 dim">'+d.os_accuracy+'%</span>']);
-  if(d.device_type)rows.push(['Device Type','<span class="kv2 dim" style="text-transform:capitalize;">'+d.device_type.replace('_',' ')+'</span>']);
-  rows.push(['TTL','<span class="kv2">'+(d.ttl||'&#8212;')+'</span>']);
-  if(d.last_seen)rows.push(['Last Seen','<span class="kv2 dim">'+d.last_seen.replace('T',' ').slice(0,19)+'Z</span>']);
-  rows.push(['Scan Method','<span class="smbadge sm-'+sm+'">'+sm+'</span>']);
-  const sv=d.service_versions,svc=d.services;
-  if(sv&&Object.keys(sv).length){{
-    const lines=Object.entries(sv).map(([p,s])=>'<span class="kv2 dim">'+p+' / '+(s.product||s.name||'?')+(s.version?' '+s.version:'')+'</span>');
-    rows.push(['Services','<div style="display:flex;flex-direction:column;gap:3px;">'+lines.join('')+'</div>']);
-  }}else if(svc&&Object.keys(svc).length){{
-    const lines=Object.entries(svc).map(([p,s])=>'<span class="kv2 dim">'+p+' / '+s+'</span>');
-    rows.push(['Services','<div style="display:flex;flex-direction:column;gap:3px;">'+lines.join('')+'</div>']);
-  }}
-  if(d.os_cpe&&d.os_cpe.length)rows.push(['CPE','<span class="kv2" style="font-size:9.5px;opacity:.65;">'+d.os_cpe.slice(0,2).join('<br>')+'</span>']);
-  const fhtml=rows.map(([k,v])=>'<div class="kv"><span class="kk">'+k+'</span>'+v+'</div>').join('');
-  let vhtml='';
-  if(!d.vulnerabilities||!d.vulnerabilities.length){{
-    vhtml='<div class="no-v"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ED573" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>No vulnerabilities detected</div>';
-  }}else{{
-    vhtml=d.vulnerabilities.map(v=>{{
-      const sl=(v.severity||'low').toLowerCase()[0];
-      return'<div class="vi vi-'+sl+'"><div class="vhdr">'+badge((v.severity||'LOW').toUpperCase())+(v.cve?'<span class="vcve">'+v.cve+'</span>':'')+'<span style="font-size:10.5px;color:{t2};">'+( v.type||'')+'</span></div><div class="vdesc">'+(v.description||'')+'</div></div>';
-    }}).join('');
-  }}
-  return'<div class="xpanel open"><div class="xf"><div class="xdt">Asset Details</div>'+fhtml+'</div><div class="xv"><div class="xdt">Vulnerabilities ('+((d.vulnerabilities||[]).length)+')</div>'+vhtml+'</div></div>';
-}}
-function render(devs){{
-  const tb=document.getElementById('tbody');
-  tb.innerHTML='';
-  document.getElementById('countLbl').textContent='Live Asset Inventory \u2014 '+devs.length+' device'+(devs.length!==1?'s':'');
-  if(!devs.length){{tb.innerHTML='<tr><td colspan="8"><div class="empty">No devices match filters.</div></td></tr>';return;}}
-  devs.forEach((d,i)=>{{
-    const sev=topSev(d.vulnerabilities);const dt=d.device_type||'unknown';
-    const tr=document.createElement('tr');tr.className='dr';tr.style.animationDelay=(i*25)+'ms';
-    tr.innerHTML='<td style="padding-left:12px;"><div class="expind"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><polyline points="2,1 6,4 2,7" stroke="{t2}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></td>'
-      +'<td><span class="ip">'+(d.ip_address||'&#8212;')+'</span></td>'
-      +'<td><span class="mac">'+(d.mac_address||'&#8212;')+'</span></td>'
-      +'<td style="color:{t1};">'+(d.hostname||'&#8212;')+'</td>'
-      +'<td><div class="dcell">'+typeIcon(dt)+'<span class="dlbl">'+(d.manufacturer||'Unknown')+'</span></div></td>'
-      +'<td><span class="osfam">'+(d.os_family||'&#8212;')+'</span></td>'
-      +'<td>'+portBadges(d.open_ports)+'</td>'
-      +'<td>'+badge(sev)+'</td>';
-    const xtr=document.createElement('tr');xtr.className='xr';
-    const xtd=document.createElement('td');xtd.colSpan=8;
-    xtd.innerHTML=detailPanel(d);
-    const panel=xtd.querySelector('.xpanel');panel.classList.remove('open');
-    xtr.appendChild(xtd);
-    tr.addEventListener('click',()=>{{
-      const isOpen=panel.classList.contains('open');
-      document.querySelectorAll('.xpanel.open').forEach(p=>p.classList.remove('open'));
-      document.querySelectorAll('.dr.xopen').forEach(r=>r.classList.remove('xopen'));
-      if(!isOpen){{panel.classList.add('open');tr.classList.add('xopen');}}
-    }});
-    tb.appendChild(tr);tb.appendChild(xtr);
-  }});
-}}
-function sortArr(arr){{
-  if(!CS.k)return arr;
-  return[...arr].sort((a,b)=>{{
-    let va,vb;
-    if(CS.k==='_risk'){{
-      va=ORD[topSev(a.vulnerabilities)]??5;vb=ORD[topSev(b.vulnerabilities)]??5;
-      return CS.asc?va-vb:vb-va;
-    }}
-    va=(a[CS.k]||'').toString().toLowerCase();vb=(b[CS.k]||'').toString().toLowerCase();
-    if(va<vb)return CS.asc?-1:1;if(va>vb)return CS.asc?1:-1;return 0;
-  }});
-}}
-function go(){{
-  const q=document.getElementById('srch').value.toLowerCase();
-  const sv=document.getElementById('sevF').value.toUpperCase();
-  const ty=document.getElementById('typeF').value;
-  const vn=document.getElementById('venF').value.toLowerCase();
-  let f=DEVS.filter(d=>{{
-    const ms=!q||(d.ip_address||'').toLowerCase().includes(q)||(d.hostname||'').toLowerCase().includes(q)||(d.mac_address||'').toLowerCase().includes(q)||(d.manufacturer||'').toLowerCase().includes(q)||(d.os_family||'').toLowerCase().includes(q);
-    const ts=topSev(d.vulnerabilities);
-    return ms&&(!sv||ts===sv)&&(!ty||(d.device_type||'unknown')===ty)&&(!vn||(d.manufacturer||'').toLowerCase().includes(vn));
-  }});
-  render(sortArr(f));
-}}
-function srt(k){{
-  document.querySelectorAll('.tbl th').forEach(h=>h.classList.remove('sorted'));
-  CS.asc=CS.k===k?!CS.asc:true;CS.k=k;
-  const cols=['_x','ip_address','mac_address','hostname','manufacturer','os_family','_ports','_risk'];
-  const idx=cols.indexOf(k);if(idx>=0)document.querySelectorAll('.tbl th')[idx].classList.add('sorted');
-  go();
-}}
-go();
-</script></body></html>"""
+// --- AUTH CONFIG ---
+const API = 'REPLACE_API_URL'; 
+const AUTH_HEADERS = { 'X-API-Key': 'REPLACE_API_KEY' };
 
-        components.html(TABLE_HTML, height=740, scrolling=True)
-    else:
-        st.markdown(f"""
-        <div style="background:{THEME['bg2']};border:1px solid {THEME['border']};
-                    border-radius:10px;padding:52px;text-align:center;">
-          <div style="font-family:'DM Sans',sans-serif;color:{THEME['t3']};font-size:14px;">
-            No devices found. Run a scan agent to populate data.
-          </div>
-        </div>""", unsafe_allow_html=True)
+let allDevices=[], allEvents=[], stats={}, currentPage='dashboard';
+let scanPolling=null;
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ── TAB: ANALYTICS ────────────────────────────────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════════
-elif st.session_state.active_tab == "analytics":
-    if df.empty:
-        st.info("No device data available. Run a scan to populate analytics.")
-    else:
-        defaults = plotly_defaults()
+// Authenticated Fetch Wrapper
+async function secureFetch(url, options = {}) {
+  options.headers = { ...options.headers, ...AUTH_HEADERS };
+  return fetch(url, options);
+}
 
-        # ── Row 1: Vendor pie + OS bar ────────────────────────────────────────
-        col_l, col_r = st.columns(2)
+async function fetchAll() {
+  try {
+    const [d,e,s] = await Promise.all([
+      secureFetch(`${API}/devices`).then(r=>r.json()),
+      secureFetch(`${API}/events`).then(r=>r.json()),
+      secureFetch(`${API}/stats`).then(r=>r.json()),
+    ]);
+    allDevices=Array.isArray(d)?d:[];
+    allEvents=Array.isArray(e)?e:[];
+    stats=s||{};
+    document.getElementById('last-updated').textContent='updated '+new Date().toLocaleTimeString();
+    renderPage();
+  } catch(e) {
+    document.getElementById('content').innerHTML=`<div class="empty">Cannot reach API at ${API}<br><small>${e.message}</small></div>`;
+  }
+}
 
-        with col_l:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                Device Vendor Distribution
-              </div>""", unsafe_allow_html=True)
-            vendor_counts = df["manufacturer"].fillna("Unknown").value_counts().reset_index()
-            vendor_counts.columns = ["Vendor","Count"]
-            colors = [ACCENT,"#FF4757","#2ED573","#FFA502","#9B59B6","#E74C3C","#3498DB","#27AE60"]
-            fig_v = px.pie(vendor_counts, names="Vendor", values="Count",
-                           color_discrete_sequence=colors, hole=0.45)
-            fig_v.update_traces(textfont_size=11, textfont_family="DM Sans",
-                                textinfo="percent+label",
-                                hovertemplate="<b>%{label}</b><br>Devices: %{value}<br>Share: %{percent}<extra></extra>")
-            fig_v.update_layout(**defaults, height=280,
-                                legend=dict(font=dict(size=10,family="DM Sans",color=THEME["plotly_font"]),
-                                           bgcolor="rgba(0,0,0,0)",borderwidth=0,orientation="v"))
-            st.plotly_chart(fig_v, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+async function checkOllama() {
+  try {
+    const r = await secureFetch(`${API}/ai/status`);
+    const d = await r.json();
+    const dot = document.getElementById('ai-dot');
+    const txt = document.getElementById('ai-status-text');
+    if(d.online) {
+      dot.classList.add('online');
+      txt.textContent = `Ollama: ${d.models[0]||'online'}`;
+    } else {
+      dot.classList.remove('online');
+      txt.textContent = 'Ollama: offline';
+    }
+  } catch(e) {
+    document.getElementById('ai-status-text').textContent='Ollama: offline';
+  }
+}
 
-        with col_r:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                OS / Device Family
-              </div>""", unsafe_allow_html=True)
-            os_counts = df["os_family"].fillna("Unknown").value_counts().head(8).reset_index()
-            os_counts.columns = ["OS","Count"]
-            fig_os = px.bar(os_counts, x="Count", y="OS", orientation="h",
-                            color="Count", color_continuous_scale=[[0,THEME['bg3']],[1,ACCENT]])
-            fig_os.update_traces(hovertemplate="<b>%{y}</b><br>Devices: %{x}<extra></extra>")
-            fig_os.update_layout(**defaults, height=280,
-                                 yaxis=dict(categoryorder="total ascending",tickfont=dict(size=10)),
-                                 xaxis=dict(showgrid=True,gridcolor=THEME["plotly_grid"]),
-                                 coloraxis_showscale=False)
-            st.plotly_chart(fig_os, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+async function triggerScan() {
+  const subnet = document.getElementById('subnet-input').value||'192.168.30';
+  const btn = document.getElementById('scan-btn');
+  const ind = document.getElementById('scanning-ind');
+  btn.disabled=true; btn.textContent='Scanning...';
+  ind.style.display='block';
 
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+  try {
+    await secureFetch(`${API}/scan/trigger`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subnet})});
+    showToast('Scan started for '+subnet);
+    scanPolling = setInterval(async()=>{
+      try {
+        const r = await secureFetch(`${API}/scan/status`);
+        const d = await r.json();
+        if(!d.scanning) {
+          clearInterval(scanPolling);
+          btn.disabled=false; btn.textContent='→ Scan Now';
+          ind.style.display='none';
+          await fetchAll();
+          showToast('Scan complete — dashboard updated');
+        }
+      } catch(e){ clearInterval(scanPolling); btn.disabled=false; btn.textContent='→ Scan Now'; ind.style.display='none'; }
+    }, 3000);
+  } catch(e) {
+    btn.disabled=false; btn.textContent='→ Scan Now'; ind.style.display='none';
+    showToast('Cannot reach API');
+  }
+}
 
-        # ── Row 2: Risk donut + Port frequency ───────────────────────────────
-        col_l2, col_r2 = st.columns(2)
+function showPage(page,btn) {
+  currentPage=page;
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const titles={dashboard:'Dashboard',assets:'Asset Registry',threats:'Threat Events'};
+  document.getElementById('page-title').textContent=titles[page]||page;
+  renderPage();
+}
 
-        with col_l2:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                Risk Profile Breakdown
-              </div>""", unsafe_allow_html=True)
-            sev_map = {"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}
-            risk_counts = {"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"CLEAN":0}
-            for _, row in df.iterrows():
-                vulns = row.get("vulnerabilities",[])
-                if not isinstance(vulns,list): vulns=[]
-                top = "CLEAN"
-                for s in ["CRITICAL","HIGH","MEDIUM","LOW"]:
-                    if any(v.get("severity","").upper()==s for v in vulns):
-                        top = s; break
-                risk_counts[top] = risk_counts.get(top,0)+1
-            risk_df = pd.DataFrame(list(risk_counts.items()),columns=["Risk","Count"])
-            risk_df = risk_df[risk_df["Count"]>0]
-            risk_colors = {"CRITICAL":DANGER,"HIGH":WARN,"MEDIUM":ACCENT,"LOW":"#2ECC71","CLEAN":SAFE}
-            fig_r = px.pie(risk_df, names="Risk", values="Count", hole=0.5,
-                           color="Risk", color_discrete_map=risk_colors)
-            fig_r.update_traces(textfont_size=11,textfont_family="DM Sans",
-                                textinfo="percent+label",
-                                hovertemplate="<b>%{label}</b><br>Devices: %{value}<extra></extra>")
-            fig_r.update_layout(**defaults, height=280,
-                                legend=dict(font=dict(size=10,family="DM Sans",color=THEME["plotly_font"]),
-                                           bgcolor="rgba(0,0,0,0)",borderwidth=0))
-            st.plotly_chart(fig_r, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+function renderPage() {
+  if(currentPage==='dashboard') renderDashboard();
+  else if(currentPage==='assets') renderAssets();
+  else if(currentPage==='threats') renderThreats();
+}
 
-        with col_r2:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                Top Open Ports Across Network
-              </div>""", unsafe_allow_html=True)
-            from collections import Counter
-            port_ctr: Counter = Counter()
-            port_svc_map = {21:"FTP",22:"SSH",23:"Telnet",25:"SMTP",53:"DNS",
-                            80:"HTTP",110:"POP3",143:"IMAP",161:"SNMP",443:"HTTPS",
-                            445:"SMB",502:"Modbus",554:"RTSP",1883:"MQTT",3306:"MySQL",
-                            3389:"RDP",8080:"HTTP-Alt",8443:"HTTPS-Alt",37777:"Dahua-SDK",34567:"DVR-Web"}
-            for _, row in df.iterrows():
-                ports_raw = row.get("open_ports",[])
-                if isinstance(ports_raw,list):
-                    port_ctr.update(ports_raw)
-            if port_ctr:
-                top_ports = port_ctr.most_common(12)
-                ports_df = pd.DataFrame(top_ports, columns=["Port","Count"])
-                ports_df["Label"] = ports_df["Port"].apply(lambda p: f"{p}/{port_svc_map.get(p,'?')}")
-                bar_colors = [DANGER if p in (23,21,37777,34567,1883) else
-                              WARN   if p in (3389,161,502,47808) else ACCENT
-                              for p in ports_df["Port"]]
-                fig_p = px.bar(ports_df, x="Label", y="Count", color_discrete_sequence=[ACCENT])
-                fig_p.update_traces(marker_color=bar_colors,
-                                    hovertemplate="<b>Port %{x}</b><br>Devices: %{y}<extra></extra>")
-                fig_p.update_layout(**defaults, height=280,
-                                    xaxis=dict(tickfont=dict(size=9),tickangle=-30),
-                                    yaxis=dict(showgrid=True,gridcolor=THEME["plotly_grid"]))
-                st.plotly_chart(fig_p, use_container_width=True)
-            else:
-                st.markdown(f'<div style="color:{THEME["t3"]};padding:40px;text-align:center;font-size:13px;">No open ports detected.</div>', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+function renderDashboard() {
+  const byVendor={};
+  allDevices.forEach(d=>{const v=d.manufacturer||d.vendor||'Unknown';byVendor[v]=(byVendor[v]||0)+1;});
+  const topV=Object.entries(byVendor).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxV=topV[0]?.[1]||1;
+  const vuln=allDevices.filter(d=>d.vulnerabilities&&d.vulnerabilities.length>0);
 
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+  document.getElementById('content').innerHTML=`
+    <div class="metrics">
+      <div class="metric-card"><div class="metric-label">Total Assets</div><div class="metric-value">${stats.total_devices||allDevices.length}</div><div class="metric-sub">latest scan</div></div>
+      <div class="metric-card"><div class="metric-label">Vulnerable</div><div class="metric-value orange">${stats.vulnerable||vuln.length}</div><div class="metric-sub">require attention</div></div>
+      <div class="metric-card"><div class="metric-label">Critical</div><div class="metric-value red">${stats.critical||0}</div><div class="metric-sub">immediate action</div></div>
+      <div class="metric-card"><div class="metric-label">Clean</div><div class="metric-value green">${stats.clean||0}</div><div class="metric-sub">no issues</div></div>
+    </div>
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Vendor Distribution</span><span class="panel-badge">${Object.keys(byVendor).length} vendors</span></div>
+        <div style="padding:16px 18px;">
+          ${topV.map(([v,c])=>`<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;">${v}</span><span style="font-size:11px;font-family:var(--mono);color:var(--muted);">${c}</span></div><div style="height:4px;background:var(--surface2);border-radius:2px;"><div style="height:4px;background:var(--accent);border-radius:2px;width:${Math.round(c/maxV*100)}%;"></div></div></div>`).join('')}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Recent Events</span><span class="panel-badge">${allEvents.length} total</span></div>
+        <div class="events-list">
+          ${allEvents.slice(0,8).map(e=>`<div class="event-item"><div class="event-dot ${e.severity}"></div><div class="event-body"><div class="event-ip">${e.ip_address}</div><div class="event-desc">${e.description}</div></div><div class="event-time">${e.timestamp?new Date(e.timestamp).toLocaleTimeString():''}</div></div>`).join('')||'<div class="empty">No events yet</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Vulnerable Assets</span><span class="panel-badge">${vuln.length} devices</span></div>
+      ${vuln.length?buildTable(vuln):'<div class="empty">No vulnerabilities detected</div>'}
+    </div>`;
+}
 
-        # ── Row 3: Device type bar + Vulnerability type breakdown ────────────
-        col_l3, col_r3 = st.columns(2)
+function renderAssets(filter='',sevF='',venF='') {
+  let data=allDevices.filter(d=>{
+    if(filter){const q=filter.toLowerCase();if(![d.ip_address,d.manufacturer||'',d.vendor||'',d.os_family||'',d.hostname||'',d.mac_address||''].join(' ').toLowerCase().includes(q))return false;}
+    if(sevF==='vulnerable'&&(!d.vulnerabilities||!d.vulnerabilities.length))return false;
+    if(sevF==='clean'&&d.vulnerabilities&&d.vulnerabilities.length)return false;
+    if(venF&&(d.manufacturer||d.vendor||'Unknown')!==venF)return false;
+    return true;
+  });
+  const vendors=[...new Set(allDevices.map(d=>d.manufacturer||d.vendor||'Unknown'))].sort();
+  document.getElementById('content').innerHTML=`
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Asset Registry</span><span class="panel-badge">${data.length} / ${allDevices.length}</span></div>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="1.5"/><path d="M21 21l-4.35-4.35" stroke-width="1.5"/></svg>
+          <input class="search-input" id="asset-search" placeholder="Search IP, MAC, vendor, hostname..." value="${filter}" oninput="renderAssets(this.value,document.getElementById('sev-f').value,document.getElementById('ven-f').value)">
+        </div>
+        <select class="filter-select" id="sev-f" onchange="renderAssets(document.getElementById('asset-search').value,this.value,document.getElementById('ven-f').value)">
+          <option value="" ${sevF===''?'selected':''}>All status</option>
+          <option value="vulnerable" ${sevF==='vulnerable'?'selected':''}>Vulnerable</option>
+          <option value="clean" ${sevF==='clean'?'selected':''}>Clean</option>
+        </select>
+        <select class="filter-select" id="ven-f" onchange="renderAssets(document.getElementById('asset-search').value,document.getElementById('sev-f').value,this.value)">
+          <option value="">All vendors</option>
+          ${vendors.map(v=>`<option value="${v}" ${venF===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      ${data.length?buildTable(data):'<div class="empty">No assets match filter</div>'}
+    </div>`;
+}
 
-        with col_l3:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                Device Type Classification
-              </div>""", unsafe_allow_html=True)
-            if "device_type" in df.columns:
-                dt_counts = df["device_type"].fillna("unknown").value_counts().reset_index()
-                dt_counts.columns = ["Type","Count"]
-                dt_counts["Type"] = dt_counts["Type"].str.replace("_"," ").str.title()
-                dt_colors = ["#00AAFF","#9B59B6","#FF8C00","#2ED573","#2E86C1","#F0B90B","#AF7AC5","#4A5568"]
-                fig_dt = px.bar(dt_counts, x="Type", y="Count",
-                                color="Type", color_discrete_sequence=dt_colors)
-                fig_dt.update_traces(hovertemplate="<b>%{x}</b><br>Count: %{y}<extra></extra>")
-                fig_dt.update_layout(**defaults, height=270, showlegend=False,
-                                     xaxis=dict(tickfont=dict(size=10)),
-                                     yaxis=dict(showgrid=True,gridcolor=THEME["plotly_grid"]))
-                st.plotly_chart(fig_dt, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+function renderThreats() {
+  document.getElementById('content').innerHTML=`
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Security Event Timeline</span><span class="panel-badge">${allEvents.length} events</span></div>
+      <div class="events-list" style="max-height:none;">
+        ${allEvents.map(e=>`<div class="event-item"><div class="event-dot ${e.severity}"></div><div class="event-body"><div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span class="event-ip">${e.ip_address}</span><span class="badge badge-${(e.severity||'clean').toLowerCase()}">${e.severity}</span><span style="font-size:10px;font-family:var(--mono);color:var(--muted);">${e.event_type}</span></div><div class="event-desc" style="white-space:normal;">${e.description}</div></div><div class="event-time">${e.timestamp?new Date(e.timestamp).toLocaleString():''}</div></div>`).join('')||'<div class="empty">No events</div>'}
+      </div>
+    </div>`;
+}
 
-        with col_r3:
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {THEME['border']};
-                        border-radius:10px;padding:14px 18px 4px;">
-              <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
-                          text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:8px;">
-                Vulnerability Type Breakdown
-              </div>""", unsafe_allow_html=True)
-            if all_vulns:
-                vtype_ctr: Counter = Counter()
-                for v in all_vulns: vtype_ctr[v.get("type","Unknown")] += 1
-                vt_df = pd.DataFrame(list(vtype_ctr.most_common(10)), columns=["Type","Count"])
-                fig_vt = px.bar(vt_df, x="Count", y="Type", orientation="h",
-                                color="Count",
-                                color_continuous_scale=[[0,THEME['bg3']],[0.5,WARN],[1,DANGER]])
-                fig_vt.update_traces(hovertemplate="<b>%{y}</b><br>Occurrences: %{x}<extra></extra>")
-                fig_vt.update_layout(**defaults, height=270, coloraxis_showscale=False,
-                                     yaxis=dict(categoryorder="total ascending",tickfont=dict(size=9)),
-                                     xaxis=dict(showgrid=True,gridcolor=THEME["plotly_grid"]))
-                st.plotly_chart(fig_vt, use_container_width=True)
-            else:
-                st.markdown(f'<div style="color:{THEME["t3"]};padding:40px;text-align:center;font-size:13px;">No vulnerabilities to chart.</div>', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+function deviceIcon(d) {
+  const v=(d.manufacturer||d.vendor||'').toLowerCase();
+  const ports=d.open_ports||[];
+  if(['hikvision','dahua','axis','vivotek','hanwha','reolink','amcrest'].some(x=>v.includes(x))||ports.includes(554)||ports.includes(8554))return['icon-camera','📷'];
+  if(['ubiquiti','mikrotik','netgear','tp-link'].some(x=>v.includes(x)))return['icon-router','🔀'];
+  if(ports.includes(1883)||ports.includes(5683))return['icon-iot','📡'];
+  return['icon-unknown','❓'];
+}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ── TAB: ALERTS ───────────────────────────────────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════════
-elif st.session_state.active_tab == "alerts":
-    if not all_vulns:
-        st.markdown(f"""
-        <div style="background:{THEME['card_bg']};border:1px solid rgba(46,213,115,.2);
-                    border-radius:10px;padding:40px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">✅</div>
-          <div style="font-family:'DM Sans',sans-serif;color:{SAFE};font-size:15px;font-weight:600;">
-            No Active Alerts
-          </div>
-          <div style="font-family:'DM Sans',sans-serif;color:{THEME['t3']};font-size:13px;margin-top:6px;">
-            All scanned devices are clean.
-          </div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        # Summary strip
-        sev_counts = Counter(v.get("severity","?") for v in all_vulns)
-        s1,s2,s3,s4 = st.columns(4)
-        def alert_mini(label, count, color):
-            return f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {color}33;border-radius:8px;padding:14px 16px;">
-              <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:{THEME['t3']};margin-bottom:6px;">{label}</div>
-              <div style="font-size:28px;font-weight:700;color:{color};">{count}</div>
-            </div>"""
-        with s1: st.markdown(alert_mini("Critical",sev_counts.get("CRITICAL",0),DANGER), unsafe_allow_html=True)
-        with s2: st.markdown(alert_mini("High",sev_counts.get("HIGH",0),WARN), unsafe_allow_html=True)
-        with s3: st.markdown(alert_mini("Medium",sev_counts.get("MEDIUM",0),ACCENT), unsafe_allow_html=True)
-        with s4: st.markdown(alert_mini("Low",sev_counts.get("LOW",0),SAFE), unsafe_allow_html=True)
+function topSev(vulns) {
+  if(!vulns||!vulns.length)return null;
+  for(const s of['CRITICAL','HIGH','MEDIUM','LOW'])if(vulns.some(v=>v.severity===s))return s;
+  return null;
+}
 
-        st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+function buildTable(data) {
+  return `<div style="overflow-x:auto;"><table>
+    <thead><tr><th>IP Address</th><th>MAC</th><th>Hostname</th><th>Vendor</th><th>OS</th><th>Ports</th><th>Risk</th></tr></thead>
+    <tbody>${data.map((d,i)=>{
+      const [icls,ico]=deviceIcon(d);
+      const sev=topSev(d.vulnerabilities);
+      const badge=sev?`<span class="badge badge-${sev.toLowerCase()}">${sev}</span>${d.vulnerabilities.length>1?` <span style="font-size:10px;color:var(--muted);">${d.vulnerabilities.length}</span>`:''}` :`<span class="badge badge-clean">Clean</span>`;
+      const ports=(d.open_ports||[]).slice(0,5).map(p=>`<span class="port-tag">${p}</span>`).join('')+((d.open_ports||[]).length>5?`<span style="font-size:10px;color:var(--muted);"> +${d.open_ports.length-5}</span>`:'');
+      return `<tr onclick="toggleDetail(this,${i},'${d.ip_address}')">
+        <td class="td-ip">${d.ip_address}</td>
+        <td class="td-mono">${d.mac_address||'–'}</td>
+        <td style="color:var(--muted);font-size:11.5px;">${d.hostname||'–'}</td>
+        <td><div class="vendor-cell"><div class="device-icon ${icls}">${ico}</div><span style="font-size:12px;">${d.manufacturer||d.vendor||'Unknown'}</span></div></td>
+        <td style="color:var(--muted);font-size:11.5px;">${d.os_family||'–'}</td>
+        <td>${ports}</td>
+        <td>${badge}</td>
+      </tr>
+      <tr class="detail-row" id="detail-${i}"><td colspan="7" style="padding:0;"><div class="detail-inner" id="detail-inner-${i}"></div></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
 
-        # Filter
-        sev_filter = st.selectbox("Filter by severity", ["All","CRITICAL","HIGH","MEDIUM","LOW"],
-                                  label_visibility="collapsed")
-        filtered_vulns = all_vulns if sev_filter=="All" else [v for v in all_vulns if v.get("severity")==sev_filter]
+function toggleDetail(row,idx,ip) {
+  const dr=document.getElementById(`detail-${idx}`);
+  const inner=document.getElementById(`detail-inner-${idx}`);
+  const isOpen=dr.classList.contains('open');
+  document.querySelectorAll('.detail-row.open').forEach(r=>r.classList.remove('open'));
+  document.querySelectorAll('tbody tr.selected').forEach(r=>r.classList.remove('selected'));
+  if(isOpen) return;
+  dr.classList.add('open'); row.classList.add('selected');
+  const d=allDevices.find(x=>x.ip_address===ip)||{};
+  const vulns=d.vulnerabilities||[];
+  inner.innerHTML=`
+    <div class="detail-card">
+      <h4>Asset Details</h4>
+      ${[['IP Address',d.ip_address],['MAC Address',d.mac_address||'–'],['Hostname',d.hostname||'–'],['Manufacturer',d.manufacturer||d.vendor||'Unknown'],['OS / Type',d.os_family||'–'],['Open Ports',(d.open_ports||[]).join(', ')||'None'],['Status',d.status||'online']].map(([k,v])=>`<div class="kv"><span class="kv-key">${k}</span><span class="kv-val">${v}</span></div>`).join('')}
+      <button class="ai-audit-btn" id="ai-btn-${idx}" onclick="runOllamaAudit('${ip}',${idx})">
+        🤖 AI Audit (Ollama)
+      </button>
+      <div id="ai-result-${idx}" class="ai-result" style="display:none;"></div>
+    </div>
+    <div class="detail-card">
+      <h4>Vulnerabilities (${vulns.length})</h4>
+      ${vulns.length?vulns.map(v=>`<div class="vuln-item ${v.severity||''}"><div class="vuln-type">${v.type||'Finding'}</div><div class="vuln-desc">${v.description||''}</div>${v.cve?`<div class="vuln-cve">${v.cve}</div>`:''}</div>`).join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0;">No vulnerabilities detected.</div>'}
+    </div>`;
+}
 
-        st.markdown(f"""
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;
-                    color:{THEME['t3']};margin:10px 0 8px;">
-          {len(filtered_vulns)} Alert{'s' if len(filtered_vulns)!=1 else ''}
-        </div>""", unsafe_allow_html=True)
+async function runOllamaAudit(ip, idx) {
+  const btn=document.getElementById(`ai-btn-${idx}`);
+  const result=document.getElementById(`ai-result-${idx}`);
+  const d=allDevices.find(x=>x.ip_address===ip)||{};
+  btn.disabled=true; btn.textContent='🤖 Analysing...';
+  result.style.display='block'; result.textContent='Asking Ollama...';
+  try {
+    const r=await secureFetch(`${API}/ai/audit`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ip_address:ip,open_ports:d.open_ports||[],vendor:d.manufacturer||d.vendor||'',os_family:d.os_family||'',hostname:d.hostname||'',vulnerabilities:d.vulnerabilities||[]})
+    });
+    const data=await r.json();
+    if(data.error&&!data.findings.length){
+      result.textContent='Ollama unavailable: '+data.error;
+    } else if(!data.findings.length){
+      result.textContent='✅ Ollama found no additional issues.';
+    } else {
+      result.innerHTML=data.findings.map(f=>`<div class="vuln-item ${f.severity||''}" style="margin-bottom:6px;"><div class="vuln-type"><span class="badge badge-${(f.severity||'low').toLowerCase()}">${f.severity}</span> ${f.type}</div><div class="vuln-desc">${f.description}</div></div>`).join('');
+    }
+    btn.textContent='🤖 Re-run Audit'; btn.disabled=false;
+  } catch(e) {
+    result.textContent='Error: '+e.message;
+    btn.textContent='🤖 AI Audit (Ollama)'; btn.disabled=false;
+  }
+}
 
-        sev_clr = {"CRITICAL":DANGER,"HIGH":WARN,"MEDIUM":ACCENT,"LOW":SAFE}
-        sev_border = {"CRITICAL":"rgba(255,71,87,.3)","HIGH":"rgba(255,165,2,.28)",
-                      "MEDIUM":"rgba(0,170,255,.28)","LOW":"rgba(46,213,115,.25)"}
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
 
-        for v in filtered_vulns:
-            sev  = v.get("severity","LOW")
-            clr  = sev_clr.get(sev, SAFE)
-            brd  = sev_border.get(sev, THEME["border"])
-            ip   = v.get("ip","")
-            host = v.get("hostname","")
-            mfr  = v.get("manufacturer","")
-            host_str = f"{host} ({ip})" if host and host != "Unknown" and host != ip else ip
+// --- BOOT ---
+fetchAll();
+checkOllama();
+setInterval(fetchAll,30000);
+setInterval(checkOllama,60000);
+</script>
+</body>
+</html>
+""".replace("REPLACE_API_URL", API_URL).replace("REPLACE_API_KEY", API_KEY)
 
-            st.markdown(f"""
-            <div style="background:{THEME['card_bg']};border:1px solid {brd};
-                        border-left:3px solid {clr};border-radius:8px;
-                        padding:14px 16px;margin-bottom:8px;">
-              <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                          flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="background:{clr}22;color:{clr};border:1px solid {clr}44;
-                               padding:2px 8px;border-radius:4px;font-size:9.5px;
-                               font-weight:700;letter-spacing:.07em;">{sev}</span>
-                  <span style="font-family:'DM Sans',sans-serif;font-size:13px;
-                               font-weight:600;color:{THEME['t1']};">{v.get('type','')}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;
-                               color:{ACCENT};">{host_str}</span>
-                  {f'<span style="font-size:10.5px;color:{THEME["t3"]};">{mfr}</span>' if mfr and mfr!="Unknown" else ""}
-                </div>
-              </div>
-              <div style="font-size:12px;color:{THEME['t2']};line-height:1.6;margin-bottom:6px;">
-                {v.get('description','')}
-              </div>
-              {f'<span style="font-family:IBM Plex Mono,monospace;font-size:9.5px;color:{THEME["t3"]};background:{THEME["bg3"]};padding:2px 7px;border-radius:3px;">{v.get("cve","")}</span>' if v.get("cve") else ""}
-            </div>""", unsafe_allow_html=True)
-
-# ── Auto-refresh every 30s ────────────────────────────────────────────────────
-time.sleep(30)
-st.rerun()
+# Render the page as a clean, standalone component
+components.html(RAW_HTML, height=850, scrolling=True)

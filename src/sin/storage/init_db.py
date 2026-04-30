@@ -42,6 +42,10 @@ _DEVICE_LOG_NEW_COLUMNS = [
 # New columns for security_events (description widened to TEXT)
 _SECURITY_EVENT_NEW_COLUMNS: list = []  # description already TEXT in new installs
 
+# device_baselines table is created by create_all() — no ALTER TABLE needed.
+# Listed here for documentation; kept as empty list.
+_DEVICE_BASELINE_NEW_COLUMNS: list = []
+
 
 def _apply_migrations() -> None:
     """

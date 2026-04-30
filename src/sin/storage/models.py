@@ -92,6 +92,28 @@ class DeviceLog(Base):
     scan = relationship("ScanSession", back_populates="devices")
 
 
+class DeviceBaseline(Base):
+    """
+    Golden-state snapshot for each device — taken on first discovery.
+    Subsequent scans compare current state against this baseline to detect drift.
+    """
+    __tablename__ = "device_baselines"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    ip_address   = Column(String, unique=True, index=True, nullable=False)
+
+    # Baseline network state
+    baseline_ports         = Column(JSON,    default=list)   # list[int]
+    baseline_vendor        = Column(String,  nullable=True)
+    baseline_vulnerabilities = Column(JSON,  default=list)   # list[str] — CVE IDs only
+    baseline_risk_score    = Column(Integer, nullable=True)
+    baseline_jarm_hash     = Column(String,  nullable=True)
+
+    # Lifecycle
+    created_at  = Column(DateTime, default=datetime.utcnow)
+    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SecurityEvent(Base):
     """
     Stores historical anomalies, state changes, and heuristic alerts.

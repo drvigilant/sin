@@ -126,11 +126,12 @@ class NVDIntel:
         Background task: pre-warm the cache for all known IoT vendors.
         Call this from a Celery beat task.
         """
-        for vendor_key, keywords in VENDOR_KEYWORDS.items():
+        delay = 0.6 if NVD_API_KEY else 6.1  # Intelligent delay
+	for vendor_key, keywords in VENDOR_KEYWORDS.items():
             for kw in keywords:
                 try:
                     self._get_cves(kw)
-                    time.sleep(0.6)   # NVD rate limit: ~10 req/min without key
+                    time.sleep(delay)   # NVD rate limit: ~10 req/min without key
                 except Exception as e:
                     logger.error(f"Prefetch failed for {kw}: {e}")
 
