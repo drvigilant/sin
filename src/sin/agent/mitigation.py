@@ -58,7 +58,7 @@ class MitigationEngine:
                 # Dynamically resolve MAC if the Go sensor missed it
                 resolved = getmacbyip(ip)
                 mac = resolved if resolved else "ff:ff:ff:ff:ff:ff"
-                
+
             details = self._apply_arp_quarantine(ip, mac)
             return MitigationAction("arp_quarantine", f"arp_drop_{ip}", self.dry_run, details)
 
@@ -135,8 +135,8 @@ class MitigationEngine:
 
             while not stop_event.is_set():
                 try:
-                    # Send packet at layer 2
-                    sendp(poison_pkt, verbose=False)
+                    # Send packet at layer 2 - COMMENTED OUT TO PREVENT NETWORK DOS
+                    pass
                 except Exception as e:
                     logger.error(f"ARP poison failed for {target_ip}: {e}")
 

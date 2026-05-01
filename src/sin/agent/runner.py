@@ -1,30 +1,14 @@
 """
 sin.agent.runner
 ════════════════
-Orchestrates a full assessment pass:
-  1. Discovery    — Go sensor scans the subnet
-  2. Audit        — AuditEngine applies vendor heuristics
-  3. Decision     — DecisionEngine builds a proper ThreatVerdict
-  4. Mitigation   — MitigationEngine receives the real verdict (not a fake object)
-  5. Persistence  — all results written to Postgres with full risk fields
-  6. Alerting     — Discord notified for HIGH / CRITICAL verdicts
-
-Enterprise changes in this revision
-────────────────────────────────────
-* FIXED:  MitigationEngine.isolate() now receives a real ThreatVerdict dataclass.
-          The old `type('obj', (object,), ...)` hack caused an AttributeError on
-          every quarantine trigger — silently swallowed by the bare `except`.
-* FIXED:  _is_iot() no longer drops HTTP-only Hikvision devices before audit.
-* ADDED:  DecisionEngine.evaluate() called for every asset → structured verdict.
-* ADDED:  Risk fields (score, level, reasons, verdict) stored at persist time.
-* ADDED:  Configurable DRY_RUN and CONFIDENCE_THRESHOLD via env vars.
-* ADDED:  Per-asset structured log line for SIEM ingestion.
+Orchestrates a full assessment pass with Enterprise Deduplication.
 """
 
 from __future__ import annotations
 
 import os
 import uuid
+import json
 from datetime import datetime, timezone
 from typing import Dict, List
 
@@ -43,11 +27,11 @@ from sin.utils.logger import get_logger
 
 logger = get_logger("sin.agent.runner")
 
-# ── Runtime config (override via environment) ─────────────────────────────────
-_DRY_RUN             = False
+# ── Runtime config ────────────────────────────────────────────────────────────
+_DRY_RUN              = False
 _CONFIDENCE_THRESHOLD = float(os.getenv("SIN_CONFIDENCE_THRESHOLD", "0.80"))
 
-# ── IoT classification constants ───────────────────────────────────────────────
+# ── IoT classification constants ──────────────────────────────────────────────
 _IOT_HARD_PORTS = {554, 8554, 37777, 34567, 8000, 9000, 1883, 8883, 5683, 47808, 502, 4840}
 _IOT_VENDORS    = {
     "xiongmai", "h264dvr", "hikvision", "dahua", "axis",
@@ -57,13 +41,6 @@ _MANAGED_OS = {"windows", "ubuntu", "debian", "centos", "fedora", "macos", "prox
 
 
 def _is_iot(asset: Dict) -> bool:
-    """
-    Gate function — should this asset enter the IoT audit pipeline?
-
-    Deliberately does NOT exclude HTTP-only (port 80/443/8080) devices.
-    The old `ports.issubset({80,443,8080})` guard silently dropped Hikvision
-    cameras whose only visible port from the sensor scan was 80.
-    """
     ports   = set(asset.get("open_ports", []))
     mfr     = (asset.get("manufacturer") or asset.get("vendor") or "").lower()
     banners = str(asset.get("banners", {})).lower()
@@ -78,8 +55,6 @@ def _is_iot(asset: Dict) -> bool:
     if {445, 3389}.intersection(ports) and not _IOT_HARD_PORTS.intersection(ports):
         return False
 
-    # SSH-only or pure web (80/443/8080/8443) with no IoT ports = managed device
-    # Fixes: Unifi router(.1), Linux server(.96), unknown web(.202/.207/.231)
     _WEB_MANAGED = {80, 443, 8080, 8443, 22}
     if ports.issubset(_WEB_MANAGED) and not _IOT_HARD_PORTS.intersection(ports):
         return False
@@ -88,11 +63,6 @@ def _is_iot(asset: Dict) -> bool:
 
 
 class AgentRunner:
-    """
-    One instance per scan session.
-    Create a new AgentRunner for every /scan/trigger call — do not reuse.
-    """
-
     def __init__(self) -> None:
         self.discovery  = NetworkDiscovery()
         self.auditor    = AuditEngine()
@@ -106,10 +76,7 @@ class AgentRunner:
             f"dry_run={_DRY_RUN} threshold={_CONFIDENCE_THRESHOLD}"
         )
 
-    # ── Public entry point ─────────────────────────────────────────────────────
-
     def run_assessment(self, subnet: str) -> List[Dict]:
-        """Full scan-audit-decide-mitigate cycle. Returns enriched asset list."""
         logger.info(f"[{self.session_id}] Assessment started | target={subnet}.0/24")
         start_time = datetime.now(timezone.utc)
 
@@ -131,22 +98,13 @@ class AgentRunner:
         )
         return enriched
 
-    # ── Per-asset pipeline ─────────────────────────────────────────────────────
-
     def _process_asset(self, asset: Dict) -> Dict:
         ip = asset.get("ip_address", "?")
-
-        # 1. Heuristic audit — vendor CVEs, insecure protocols
         vulns, _audit_score, _audit_action = self.auditor.evaluate_asset(asset)
         asset["vulnerabilities"] = vulns
-
-        # 2. Normalise so DecisionEngine sees sig_id fields
         asset = normalize_host(asset)
-
-        # 3. Build a real ThreatVerdict — the single source of truth for risk
         verdict: ThreatVerdict = self.decision.evaluate(asset)
 
-        # 4. Attach verdict to asset for persistence and API responses
         asset["risk_score"]   = round(verdict.confidence * 100)
         asset["risk_level"]   = verdict.severity
         asset["risk_reasons"] = verdict.reasons
@@ -158,7 +116,6 @@ class AgentRunner:
             "signals":    verdict.signal_count,
         }
 
-        # 5. Structured log line (parseable by Elasticsearch / Splunk / Loki)
         logger.info(
             f"[VERDICT] ip={ip} severity={verdict.severity} "
             f"confidence={verdict.confidence:.2f} "
@@ -166,9 +123,6 @@ class AgentRunner:
             f"signals={verdict.signal_count} vulns={len(vulns)}"
         )
 
-        # 6. Mitigation — pass the REAL ThreatVerdict dataclass
-        #    (previously passed `type('obj',(object,),...)` which crashed on
-        #     verdict.confidence access inside MitigationEngine._choose_action)
         if verdict.is_actionable(_CONFIDENCE_THRESHOLD):
             logger.warning(
                 f"[MITIGATE] {ip} | {verdict.severity} | "
@@ -188,8 +142,6 @@ class AgentRunner:
             asset["mitigation_action"]  = "none"
 
         return asset
-
-    # ── Persistence ────────────────────────────────────────────────────────────
 
     def _persist(
         self,
@@ -222,7 +174,6 @@ class AgentRunner:
                     open_ports      = asset.get("open_ports", []),
                     protocols       = list(asset.get("services", {}).values()),
                     vulnerabilities = asset.get("vulnerabilities", []),
-                    # NEW fields — persisted from Step 5 schema upgrade
                     mac_address     = asset.get("mac_address"),
                     device_type     = asset.get("device_type"),
                     risk_score      = asset.get("risk_score", 0),
@@ -231,17 +182,29 @@ class AgentRunner:
                     jarm_hash       = asset.get("jarm_hash"),
                 ))
 
+                # UPGRADE: Vulnerability Deduplication Logic
                 for vuln in asset.get("vulnerabilities", []):
-                    db.add(models.SecurityEvent(
-                        ip_address  = ip,
-                        event_type  = "VULN_DETECTED",
-                        severity    = vuln.get("severity", "INFO"),
-                        description = (
-                            f"[{vuln.get('cve', 'N/A')}] "
-                            f"{vuln.get('type', 'Unknown')}: "
-                            f"{vuln.get('description', '')}"
-                        ),
-                    ))
+                    # Construct the description once
+                    description = (
+                        f"[{vuln.get('cve', 'N/A')}] "
+                        f"{vuln.get('type', 'Unknown')}: "
+                        f"{vuln.get('description', '')}"
+                    )
+
+                    # CHECK: Does this exact issue already exist for this IP?
+                    exists = db.query(models.SecurityEvent).filter(
+                        models.SecurityEvent.ip_address == ip,
+                        models.SecurityEvent.description == description
+                    ).first()
+
+                    if not exists:
+                        # Only add if it's a NEW discovery
+                        db.add(models.SecurityEvent(
+                            ip_address  = ip,
+                            event_type  = "VULN_DETECTED",
+                            severity    = vuln.get("severity", "INFO"),
+                            description = description,
+                        ))
 
                 # Baseline drift detection
                 drift_events = baseline_engine.detect_drift(asset, db)
@@ -253,7 +216,6 @@ class AgentRunner:
                         description = drift["description"],
                     ))
 
-                # Snapshot: record golden state for new devices (no-op if already exists)
                 baseline_engine.snapshot(asset, db)
 
                 if asset.get("risk_score", 0) >= 60:
