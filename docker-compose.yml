@@ -35,7 +35,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -105,21 +105,19 @@ services:
       - sin_internal
 
   dashboard:
-    build: .
+    image: nginx:alpine
     container_name: sin_dashboard
-    # Streamlit must listen on 0.0.0.0 to be visible on your Windows host
-    command: streamlit run src/sin/ui/dashboard.py --server.address=0.0.0.0 --server.port=8501
     ports:
-      - "8501:8501"
+      - "8501:80"
     volumes:
-      - .:/app
-    environment:
-      - SIN_API_URL=http://localhost:8000
-      - SIN_API_KEY=${SIN_API_KEY}
+      - ./src/sin/ui/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - api
+    restart: unless-stopped
     networks:
       - sin_internal
+      - sin_scan
 
 volumes:
   postgres_data:
