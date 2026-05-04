@@ -76,16 +76,16 @@ cd sin
 ```
 
 ---
-
 ### 2. Configure Environment
+```bash
 cp .env.example .env
+```
 Edit .env and add required secrets.
-
 ---
 ### 3. Deploy Stack
-``bash
+```bash
 docker compose up -d --build
-
+```
 This will start:
 Nginx frontend
 FastAPI backend
@@ -93,7 +93,9 @@ Celery workers
 Redis + Database
 ---
 ### 4. Access Dashboard
+```bash
 http://localhost
+```
 ⚙️ Configuration
 ---
 ### Key environment variables:
