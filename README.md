@@ -70,7 +70,6 @@ SIN follows a **decoupled, asynchronous microservices design**:
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
-```bash
 git clone https://github.com/drvigilant/sin.git
 cd sin
 ---
@@ -89,7 +88,6 @@ Celery workers
 Redis + Database
 ---
 ### 4. Access Dashboard
-```bash
 http://localhost
 ⚙️ Configuration
 ---
