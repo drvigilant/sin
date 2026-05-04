@@ -74,7 +74,7 @@ SIN follows a **decoupled, asynchronous microservices design**:
 git clone https://github.com/drvigilant/sin.git
 cd sin
 
-2. Configure Environment
+### 2. Configure Environment
 cp .env.example .env
 Edit .env and add required secrets.
 
@@ -155,6 +155,4 @@ MIT License (or specify your license)
 
 <div align="center">
 
-"Detect. Decide. Neutralize."
 
-</div> ```
