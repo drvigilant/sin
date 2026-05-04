@@ -37,6 +37,10 @@ _DEVICE_LOG_NEW_COLUMNS = [
     ("jarm_hash",    "VARCHAR",   None),
     ("first_seen",   "TIMESTAMP", "NOW()"),
     ("last_seen",    "TIMESTAMP", "NOW()"),
+    ("telemetry",    "JSON",      "'{}'"),
+    ("firmware",     "VARCHAR",   None),
+    ("serial_number","VARCHAR",   None),
+    ("model", "VARCHAR", None),
 ]
 
 # New columns for security_events (description widened to TEXT)

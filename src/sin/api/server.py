@@ -83,7 +83,7 @@ async def api_key_middleware(request: Request, call_next):
     # CRITICAL FIX: Allow 'OPTIONS' and exempt paths to pass through
     if request.method == "OPTIONS" or request.url.path in _AUTH_EXEMPT:
         return await call_next(request)
-        
+
     if _API_KEY:
         provided = request.headers.get("X-API-Key", "")
         if provided != _API_KEY:
@@ -146,19 +146,25 @@ def get_devices(db: Session = Depends(get_db)):
     rows = db.query(models.DeviceLog).filter(models.DeviceLog.scan_id == latest_session.id).order_by(models.DeviceLog.ip_address).all()
     devices = []
     for d in rows:
-        mac, hostname, manufacturer = "Unknown", "Unknown", d.vendor or "Unknown"
-        for hint in (d.protocols or []):
-            if hint.startswith("MAC:"): mac = hint[4:]
-            elif hint.startswith("HOST:"): hostname = hint[5:]
-            elif hint.startswith("MFR:"): manufacturer = hint[4:]
         devices.append({
-            "ip_address": d.ip_address, "status": d.status, "mac_address": mac,
-            "hostname": hostname, "manufacturer": manufacturer, "vendor": d.vendor or "Unknown",
-            "os_family": d.os_family or "Unknown", "open_ports": d.open_ports or [],
-            "protocols": d.protocols or [], "vulnerabilities": d.vulnerabilities or [],
+            "ip_address": d.ip_address,
+            "status": d.status,
+            "mac_address": d.mac_address or "Unknown",
+            "hostname": d.hostname or "Unknown",
+            "manufacturer": d.vendor or "Unknown",
+            "vendor": d.vendor or "Unknown",
+            "os_family": d.os_family or "Unknown",
+            "open_ports": d.open_ports or [],
+            "protocols": d.protocols or [],
+            "vulnerabilities": d.vulnerabilities or [],
+            "firmware": getattr(d, 'firmware', None) or "Unknown",
+            "serial_number": getattr(d, 'serial_number', None) or "N/A",
+            "model": getattr(d, 'model', None) or "Unknown",
             "jarm_hash": d.jarm_hash or "",
-            "risk_score": d.risk_score, "risk_level": d.risk_level,
+            "risk_score": d.risk_score,
+            "risk_level": d.risk_level,
             "scan_id": d.scan_id,
+            "telemetry": getattr(d, 'telemetry', None) or {},
         })
     return devices
 
@@ -249,19 +255,19 @@ def agent_status():
 @app.post("/agent/isolate/{ip}")
 def isolate_device(ip: str, db: Session = Depends(get_db)):
     """Manually trigger Active ARP Quarantine for a device."""
-    if _sin_agent is None: 
+    if _sin_agent is None:
         raise HTTPException(503, "Agent not running")
-    
+
     device = db.query(models.DeviceLog).filter(models.DeviceLog.ip_address == ip).first()
     if not device:
         raise HTTPException(404, "Device not found in registry")
 
     from sin.agent.decision import ThreatVerdict
     verdict = ThreatVerdict(severity="CRITICAL", confidence=1.0, recommended_action="isolate")
-    
+
     result = _sin_agent.mitigation.isolate({"ip_address": ip, "mac_address": device.mac_address or "unknown"}, verdict)
     _sin_agent.registry.mark_mitigated(ip)
-    
+
     return {"status": "isolated", "ip": ip, "details": result.details}
 
 @app.post("/agent/whitelist/{ip}")

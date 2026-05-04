@@ -90,7 +90,13 @@ class DeviceLog(Base):
 
     # ── Relationship ───────────────────────────────────────────────────────
     scan = relationship("ScanSession", back_populates="devices")
+     
+    # ── NEW: Live Hardware Telemetry ──────────────────────────────────────────
+    telemetry = Column(JSON, default=dict) # NEW: Stores ISAPI/SNMP data like CPU, RAM, Temp
 
+    firmware      = Column(String, nullable=True) # NEW: Firmware version
+    serial_number = Column(String, nullable=True) # NEW: Hardware serial
+    model = Column(String, nullable=True) 
 
 class DeviceBaseline(Base):
     """

@@ -176,29 +176,33 @@ class AgentRunner:
                     vulnerabilities = asset.get("vulnerabilities", []),
                     mac_address     = asset.get("mac_address"),
                     device_type     = asset.get("device_type"),
+                    firmware        = asset.get("firmware"),
+                    
+                    # 🔴 CRITICAL FIX HERE: Saving the missing fields
+                    serial_number   = asset.get("serial") or asset.get("serial_number"),
+                    model           = asset.get("model"), 
+
                     risk_score      = asset.get("risk_score", 0),
                     risk_level      = asset.get("risk_level", "UNKNOWN"),
                     risk_reasons    = asset.get("risk_reasons", []),
                     jarm_hash       = asset.get("jarm_hash"),
+                    telemetry       = asset.get("telemetry", {}),
                 ))
 
                 # UPGRADE: Vulnerability Deduplication Logic
                 for vuln in asset.get("vulnerabilities", []):
-                    # Construct the description once
                     description = (
                         f"[{vuln.get('cve', 'N/A')}] "
                         f"{vuln.get('type', 'Unknown')}: "
                         f"{vuln.get('description', '')}"
                     )
 
-                    # CHECK: Does this exact issue already exist for this IP?
                     exists = db.query(models.SecurityEvent).filter(
                         models.SecurityEvent.ip_address == ip,
                         models.SecurityEvent.description == description
                     ).first()
 
                     if not exists:
-                        # Only add if it's a NEW discovery
                         db.add(models.SecurityEvent(
                             ip_address  = ip,
                             event_type  = "VULN_DETECTED",
@@ -206,7 +210,6 @@ class AgentRunner:
                             description = description,
                         ))
 
-                # Baseline drift detection
                 drift_events = baseline_engine.detect_drift(asset, db)
                 for drift in drift_events:
                     db.add(models.SecurityEvent(

@@ -6,536 +6,262 @@
   <title>SIN — SHADOWS IN THE NETWORK</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0a0a0f;
-      --panel:     #0f0f1a;
-      --detail-bg: #080810;
-      --hover:     #1a1a2a;
-      --border:    #1a1a2e;
-      --red:       #ff3b30;
-      --green:     #00ff88;
-      --orange:    #ff9f0a;
-      --blue:      #3b82f6;
-      --yellow:    #ffd60a;
-      --text:      #e0e0e0;
-      --dim:       #4a4a6a;
-      --row-grid:  180px 130px 160px 1fr 110px 130px;
+      /* SentinelOne / Elastic Slate Blue Theme */
+      --bg:        #06090e; 
+      --panel:     #0d1117; 
+      --detail-bg: #090c10;
+      --hover:     #161b22;
+      --border:    #30363d; 
+      --text:      #e6edf3; 
+      --dim:       #8b949e; 
+      
+      --red:       #f85149; 
+      --red-bg:    rgba(248, 81, 73, 0.1);
+      --red-border:rgba(248, 81, 73, 0.4);
+      --orange:    #d29922; 
+      --orange-bg: rgba(210, 153, 34, 0.1);
+      --orange-border: rgba(210, 153, 34, 0.4);
+      --green:     #2ea043; 
+      --green-bg:  rgba(46, 160, 67, 0.1);
+      --blue:      #58a6ff;
+      --claude:    #d97757; /* Anthropic Claude Color */
+      
+      --row-grid:  150px 120px 200px 1.2fr 1.2fr 110px 110px; 
     }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'DM Sans', sans-serif;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      background: var(--bg); color: var(--text); font-family: 'Roboto', sans-serif;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden; -webkit-font-smoothing: antialiased;
     }
 
-    ::-webkit-scrollbar            { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track      { background: var(--bg); }
-    ::-webkit-scrollbar-thumb      { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
 
-    /* ── TOPBAR ─────────────────────────────────────── */
+    /* ── TOPBAR & TABS ──────────────────────────────── */
     .topbar {
-      height: 52px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      flex-shrink: 0;
-      z-index: 100;
+      height: 56px; background: var(--panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; z-index: 100;
     }
+    .topbar-left { display: flex; align-items: center; gap: 14px; height: 100%; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
 
-    .topbar-left  { display: flex; align-items: center; gap: 10px; }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex-shrink: 0; box-shadow: 0 0 10px rgba(248, 81, 73, 0.3); }
+    .logo-sin { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; }
+    .vdivider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; margin: 0 8px; }
 
-    .logo-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--red);
-      flex-shrink: 0;
-    }
-
-    .logo-sin     { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; }
-
-    .logo-tagline {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .vdivider { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
-
-    .live-row { display: flex; align-items: center; gap: 6px; }
-
-    .live-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: blink 1s infinite;
-      flex-shrink: 0;
-    }
-
-    .live-label {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--green);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .lightning { font-size: 13px; color: var(--orange); }
-    .globe     { font-size: 15px; color: var(--dim); }
+    .nav-tabs { display: flex; gap: 24px; margin-left: 4px; height: 100%; align-items: center; }
+    .tab { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: color 0.2s; height: 100%; display: flex; align-items: center; border-bottom: 2px solid transparent;}
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom: 2px solid var(--red); font-weight: 600;}
 
     .subnet-input {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 12px;
-      padding: 5px 10px;
-      width: 168px;
-      outline: none;
-      letter-spacing: 0.04em;
-      transition: border-color 0.15s;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+      font-family: 'Roboto Mono', monospace; font-size: 12px; padding: 6px 12px; width: 160px; outline: none; transition: border-color 0.2s;
     }
     .subnet-input:focus { border-color: var(--blue); }
-
     .scan-btn {
-      background: transparent;
-      border: 1px solid var(--red);
-      border-radius: 4px;
-      color: var(--red);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      padding: 5px 14px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.15s, color 0.15s;
+      background: transparent; border: 1px solid var(--red); border-radius: 4px; color: var(--red);
+      font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; padding: 6px 16px; cursor: pointer; transition: all 0.2s;
     }
-    .scan-btn:hover:not(:disabled) { background: var(--red); color: #fff; }
-    .scan-btn:disabled             { cursor: default; }
-    .scan-btn.scanning             { animation: scanPulse 0.9s infinite; }
+    .scan-btn:hover:not(:disabled) { background: var(--red-bg); }
+    .scan-btn.scanning { animation: scanPulse 1.5s infinite; border-color: var(--blue); color: var(--blue); }
 
-    /* ── STAT CARDS ─────────────────────────────────── */
-    .stat-cards {
-      height: 80px;
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
+    /* ── STAT CARDS (FIXED GRID LAYOUT) ─────────────── */
+    .stat-cards { 
+        height: 90px; 
+        display: grid; 
+        /* This locks the proportions: 3 equal cards, slightly larger uptime, massive stream */
+        grid-template-columns: 1fr 1fr 1fr 1.2fr 2.5fr; 
+        border-bottom: 1px solid var(--border); 
+        background: var(--panel);
     }
-
+    
     .stat-card {
-      flex: 1;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      padding: 0 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 3px;
-      min-width: 0;
+        border-right: 1px solid var(--border); 
+        padding: 0 24px;
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center; 
+        gap: 6px;
+        min-width: 0; /* Critical: prevents text from breaking the grid cell */
     }
-    .stat-card:last-child { flex: 2; border-right: none; }
-
-    .stat-label {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
+    .stat-card:last-child { border-right: none; }
+    
+    .stat-label { 
+        font-family: 'Roboto Mono', monospace; 
+        font-size: 10px; 
+        color: var(--dim); 
+        text-transform: uppercase; 
+        letter-spacing: 0.1em; 
+        font-weight: 600;
+        white-space: nowrap;
     }
-
-    .stat-value { font-size: 32px; font-weight: 700; line-height: 1; }
-
-    .stat-sub {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    
+    .stat-value { 
+        font-size: 32px; 
+        font-weight: 700; 
+        line-height: 1; 
+        font-family: 'Roboto Mono', monospace;
     }
-
-    .stat-card-stream { justify-content: space-between; padding: 8px 14px; gap: 0; }
-
-    .stream-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    
+    .stat-sub { 
+        font-family: 'Roboto Mono', monospace; 
+        font-size: 10px; 
+        color: var(--dim); 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em; 
+        white-space: nowrap; /* Forces text to stay on one line */
+        overflow: hidden; 
+        text-overflow: ellipsis; /* Adds '...' if monitor is too small */
     }
 
-    .live-badge {
-      border: 1px solid var(--green);
-      border-radius: 4px;
-      color: var(--green);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 9px;
-      padding: 1px 6px;
-      letter-spacing: 0.08em;
-      white-space: nowrap;
+    .stat-card-stream { justify-content: space-between; padding: 14px 24px; gap: 0; }
+    .stream-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;}
+    .live-badge { border: 1px solid var(--green); border-radius: 4px; color: var(--green); font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 6px; letter-spacing: 0.08em; }
+    .mini-events { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow: hidden; justify-content: flex-start; }
+    .mini-ev { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } 
+
+    /* ── MAIN AREA & PANEL ──────────────────────────── */
+    .main-area { flex: 1; display: flex; overflow: hidden; min-height: 0; background: var(--bg); }
+    .page-content { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+    .page-content.active { display: flex; }
+
+    .edr-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+
+    /* ── TABLE HEADERS & ROWS ───────────────────────── */
+    .col-headers { 
+        height: 48px; display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 0 24px; 
+        border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--panel); align-items: center; 
     }
-    .live-badge-dot { animation: blink 1s infinite; display: inline-block; }
+    .col-header { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;}
 
-    .mini-events {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      flex: 1;
-      overflow: hidden;
-      justify-content: center;
-    }
+    .device-list { flex: 1; overflow-y: auto; overflow-x: hidden; }
 
-    .mini-ev {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── MAIN AREA ──────────────────────────────────── */
-    .main-area { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-
-    /* ── EDR PANEL ──────────────────────────────────── */
-    .edr-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      overflow: hidden;
-      min-height: 0;
-      min-width: 0;
-    }
-
-    .panel-header {
-      padding: 9px 16px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-
-    .panel-title {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .legend {
-      display: flex;
-      gap: 14px;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .legend-item { display: flex; align-items: center; gap: 4px; }
-
-    .col-headers {
-      display: grid;
-      grid-template-columns: var(--row-grid);
-      padding: 5px 16px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .col-header {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .device-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
-
-    /* ── DEVICE ROWS ────────────────────────────────── */
     .device-row { border-bottom: 1px solid var(--border); }
-
-    .device-row-main {
-      display: grid;
-      grid-template-columns: var(--row-grid);
-      padding: 9px 16px;
-      cursor: pointer;
-      align-items: center;
-      transition: background 0.12s;
-    }
+    .device-row-main { display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 16px 24px; cursor: pointer; align-items: start; transition: background 0.15s; }
     .device-row-main:hover { background: var(--hover); }
 
-    .col-endpoint { display: flex; align-items: center; gap: 8px; }
-
-    .chevron {
-      color: var(--dim);
-      font-size: 15px;
-      line-height: 1;
-      display: inline-block;
-      transition: transform 0.22s ease;
-      user-select: none;
-      width: 14px;
-      flex-shrink: 0;
-    }
+    .col-endpoint { display: flex; align-items: flex-start; gap: 8px; } 
+    .chevron { color: var(--dim); font-size: 16px; line-height: 1.1; transition: transform 0.2s ease; width: 14px; flex-shrink: 0;}
     .chevron.open { transform: rotate(90deg); }
+    
+    .ip-addr { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2;}
+    .row-hostname { font-size: 11px; color: var(--dim); margin-top: 4px; font-family: 'Roboto Mono', monospace; }
 
-    .ip-addr { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text); }
+    .col-mac .mac { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 500; line-height: 1.2;}
+    .col-mac .oui { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 4px; text-transform: uppercase;}
 
-    .row-hostname { font-size: 10px; color: var(--dim); margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
+    .col-fp { display: flex; align-items: flex-start; gap: 8px; min-width: 0;}
+    .col-fp > div { min-width: 0; width: 100%; }
+    .fp-dot { font-size: 12px; line-height: 1; flex-shrink: 0; }
+    .fp-vendor { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;}
+    .fp-os { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 4px; }
+    .hw-tag { color: var(--blue); font-size: 9px; margin-top: 6px; font-family: 'Roboto Mono', monospace; word-break: break-all; line-height: 1.4;}
 
-    .col-mac .mac { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
-    .col-mac .oui { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 2px; }
+    .col-vulns { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: -2px; }
+    .alert-box { display: inline-flex; flex-direction: column; gap: 6px; padding: 6px 10px; border-radius: 4px; font-family: 'Roboto Mono', monospace; width: fit-content; min-width: 140px; }
+    .alert-box.crit { background: var(--red-bg); border: 1px solid var(--red-border); }
+    .alert-box.high { background: var(--orange-bg); border: 1px solid var(--orange-border); }
+    .alert-box.secure { background: var(--green-bg); border: 1px solid rgba(46, 160, 67, 0.2); }
+    .cve-link { font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;}
+    .cve-link:hover { text-decoration: underline; }
+    .sev-row { display: flex; align-items: center; gap: 6px; }
+    .sev-text { font-size: 9px; font-weight: 700; text-transform: uppercase; }
 
-    .col-fp { display: flex; align-items: flex-start; gap: 6px; }
-    .fp-dot { font-size: 10px; margin-top: 3px; flex-shrink: 0; }
-    .fp-vendor { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-    .fp-os { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 2px; }
-
-    .col-vulns { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
-
-    .cve-pill {
-      display: inline-block;
-      border: 1px solid var(--red);
-      border-radius: 4px;
-      color: var(--red);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      padding: 1px 7px;
-      text-decoration: none;
-      line-height: 1.5;
-      transition: background 0.12s;
-    }
-    .cve-pill:hover { background: rgba(255,59,48,0.12); }
-
-    .sev-row { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-    .sev-dot { font-size: 9px; }
-    .sev-text { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-
-    .secure-badge { display: flex; align-items: center; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
-
-    .col-risk { display: flex; align-items: center; gap: 8px; }
+    .col-network { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;}
+    .port-pill { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 6px; }
+    
+    .col-risk { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-end; height: 16px;}
     .risk-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-    .risk-fill  { height: 100%; border-radius: 2px; width: 0; transition: width 0.8s ease; }
-    .risk-num   { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; width: 26px; text-align: right; flex-shrink: 0; }
+    .risk-fill  { height: 100%; border-radius: 2px; width: 0; transition: width 0.8s; }
+    .risk-num   { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
 
-    .col-mit { display: flex; align-items: center; }
-
+    /* FIXED QUARANTINE BUTTON */
+    .col-mit { display: flex; align-items: flex-start; justify-content: flex-end; }
     .quar-btn {
-      background: transparent;
-      border: 1px solid var(--red);
-      border-radius: 4px;
-      color: var(--red);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding: 4px 9px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.12s;
+      background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--dim);
+      font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase;
+      padding: 6px 12px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center; margin-top: -3px;
     }
-    .quar-btn:hover { background: rgba(255,59,48,0.1); }
+    .quar-btn.active { background: var(--claude); border-color: var(--claude); color: #000; font-weight: 700; }
+    .quar-btn.active:hover { opacity: 0.85; }
+    .quar-btn.restore { border-color: var(--blue); color: var(--blue); }
 
-    /* ── DEVICE DETAIL ──────────────────────────────── */
-    .device-detail {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      background: var(--detail-bg);
-      border-top: 1px solid var(--border);
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.28s ease;
-    }
-    .device-detail.open { max-height: 420px; }
+    /* ── FORENSICS PANEL (RICH DROPDOWN) ────────────── */
+    .device-detail { display: grid; grid-template-columns: 300px 1.5fr 1fr; background: var(--detail-bg); max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+    .device-detail.open { max-height: 400px; border-top: 1px solid var(--border); box-shadow: inset 0 4px 6px rgba(0,0,0,0.2);}
+    .detail-col { padding: 20px 24px; border-right: 1px solid var(--border); overflow-y: auto; }
+    .detail-hdr { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; font-weight: 600;}
+    
+    .id-grid { display: grid; grid-template-columns: 80px 1fr; gap: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 10px; margin-bottom: 16px;}
+    .id-lbl { color: var(--dim); }
+    .id-val { color: var(--text); font-weight: 600; word-break: break-all;}
 
-    .detail-col { padding: 12px 14px; border-right: 1px solid var(--border); overflow: hidden; }
-    .detail-col:last-child { border-right: none; }
+    .finding-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .finding-item { font-size: 11px; color: var(--text); display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; font-family: 'Roboto Mono', monospace; background: var(--panel); padding: 10px; border: 1px solid var(--border); border-radius: 4px;}
+    .rem-list { margin-top: 8px; margin-left: 16px; list-style-type: square; color: var(--dim); }
+    .rem-list li { margin-bottom: 4px; }
 
-    .detail-hdr {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 10px;
-    }
-
-    .detail-hdr-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .detail-hdr-row .detail-hdr { margin-bottom: 0; font-size: 9px; }
-
-    .finding-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
-    .finding-item { font-size: 11px; color: var(--text); display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
-    .ydot { color: var(--orange); flex-shrink: 0; font-size: 10px; margin-top: 2px; }
-
-    .port-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
-    .port-pill {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--dim);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      padding: 2px 8px;
-    }
-
-    .detail-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
-
-    .cve-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-    .cve-pill-detail {
-      display: inline-block;
-      border: 1px solid var(--red);
-      border-radius: 4px;
-      color: var(--red);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      padding: 2px 7px;
-      text-decoration: none;
-      transition: background 0.12s;
-    }
-    .cve-pill-detail:hover { background: rgba(255,59,48,0.12); }
-
-    .audit-run-btn {
-      background: transparent;
-      border: 1px solid var(--dim);
-      border-radius: 4px;
-      color: var(--dim);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding: 2px 8px;
-      cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
-      white-space: nowrap;
+    /* FIXED AI INITIALIZE BUTTON */
+    .audit-run-btn { 
+        background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim); 
+        font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; 
+        padding: 4px 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
     }
     .audit-run-btn:hover { border-color: var(--blue); color: var(--blue); }
-
-    .audit-out {
-      width: 100%;
-      height: 120px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 10px;
-      line-height: 1.6;
-      padding: 7px 9px;
-      resize: none;
-      outline: none;
-    }
+    .audit-out { width: 100%; height: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--green); font-family: 'Roboto Mono', monospace; font-size: 11px; line-height: 1.6; padding: 12px; resize: none; outline: none; margin-top: 12px;}
 
     /* ── EVENT SIDEBAR ──────────────────────────────── */
-    .event-sidebar {
-      width: 280px;
-      flex-shrink: 0;
-      background: var(--panel);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    .sidebar-hdr {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-
-    .sidebar-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
-
+    .event-sidebar { width: 340px; flex-shrink: 0; background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+    .sidebar-hdr { height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .sidebar-title { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;}
     .event-list { flex: 1; overflow-y: auto; min-height: 0; }
-
-    .ev-entry { padding: 7px 12px; border-bottom: 1px solid rgba(26,26,46,0.6); }
-    .ev-entry.new-ev { animation: slideIn 0.3s ease forwards; }
-
-    .ev-line1 { display: flex; align-items: center; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; white-space: nowrap; overflow: hidden; }
+    .ev-entry { padding: 14px 24px; border-bottom: 1px solid var(--border); }
+    .ev-entry.new-ev { animation: slideIn 0.4s forwards; }
+    .ev-line1 { display: flex; align-items: center; gap: 8px; font-family: 'Roboto Mono', monospace; font-size: 10px; margin-bottom: 6px;}
     .ev-ts   { color: var(--blue); flex-shrink: 0; }
-    .ev-type { font-weight: 700; text-transform: uppercase; flex-shrink: 0; }
-    .ev-ip   { color: var(--dim); overflow: hidden; text-overflow: ellipsis; }
+    .ev-type { font-weight: 700; text-transform: uppercase; flex-shrink: 0; padding: 2px 6px; border-radius: 4px;}
+    .ev-type.warn { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border);}
+    .ev-type.info { background: rgba(88, 166, 255, 0.1); color: var(--blue); border: 1px solid rgba(88, 166, 255, 0.3);}
+    .ev-line2 { font-family: 'Roboto', sans-serif; font-size: 11px; color: var(--text); line-height: 1.5; word-wrap: break-word;}
 
-    .ev-line2 { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .footer { height: 36px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; }
+    .footer-text { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+    .state-msg { padding: 40px 24px; font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; text-align: center; }
 
-    /* ── FOOTER ─────────────────────────────────────── */
-    .footer {
-      height: 26px;
-      background: var(--panel);
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      flex-shrink: 0;
-    }
-
-    .footer-text { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
-
-    /* ── EMPTY / ERROR ───────────────────────────────── */
-    .state-msg { padding: 36px 20px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; text-align: center; }
-    .state-msg.err { color: var(--red); }
-
-    /* ── ANIMATIONS ─────────────────────────────────── */
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
-    }
-
-    @keyframes scanPulse {
-      0%, 100% { border-color: var(--red);   color: var(--red);   box-shadow: none; }
-      50%       { border-color: #ff6b35; color: #ff6b35; box-shadow: 0 0 10px rgba(255,59,48,0.3); }
-    }
-
-    @keyframes slideIn {
-      from { transform: translateX(18px); opacity: 0; }
-      to   { transform: translateX(0);    opacity: 1; }
-    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes scanPulse { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(88, 166, 255, 0.3); border-color: rgba(88, 166, 255, 0.8); } }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   </style>
 </head>
 <body>
 
-<!-- ═══════════ TOPBAR ═══════════════════════════════ -->
 <header class="topbar">
   <div class="topbar-left">
     <div class="logo-dot"></div>
     <span class="logo-sin">SIN</span>
-    <span class="logo-tagline">Shadows in the Network</span>
     <div class="vdivider"></div>
-    <div class="live-row">
-      <div class="live-dot"></div>
-      <span class="live-label">Live Telemetry</span>
-      <span class="lightning">&#x26A1;</span>
+    <div class="nav-tabs">
+        <div class="tab active" onclick="switchPage('edr')">EDR Overview</div>
+        <div class="tab" onclick="switchPage('threat')">Threat Intel</div>
+        <div class="tab" onclick="switchPage('network')">Network Analyzer</div>
+        <div class="tab" onclick="switchPage('policy')">Policies</div>
     </div>
   </div>
   <div class="topbar-right">
-    <span class="globe">&#x25CE;</span>
     <input id="subnet-input" class="subnet-input" type="text" value="192.168.30.0/24" spellcheck="false">
     <button id="scan-btn" class="scan-btn" onclick="triggerScan()">&#x27F3; SCAN NOW</button>
   </div>
 </header>
 
-<!-- ═══════════ STAT CARDS ══════════════════════════ -->
 <section class="stat-cards">
   <div class="stat-card">
     <div class="stat-label">Total Endpoints</div>
@@ -554,112 +280,112 @@
   </div>
   <div class="stat-card">
     <div class="stat-label">SIN Uptime</div>
-    <div class="stat-value" id="stat-uptime" style="font-family:'IBM Plex Mono',monospace;font-size:26px;">00:00:00</div>
+    <div class="stat-value" id="stat-uptime">00:00:00</div>
     <div class="stat-sub" id="stat-uptime-sub">Last scan &#8212;</div>
   </div>
   <div class="stat-card stat-card-stream">
     <div class="stream-header">
-      <span class="stat-label">&#x25C8; Live Event Stream</span>
-      <span class="live-badge"><span class="live-badge-dot">&#x25CF;</span> LIVE</span>
+      <span class="stat-label">&#x25C8; Activity Stream</span>
     </div>
     <div class="mini-events" id="mini-events">
-      <div class="mini-ev" style="color:var(--dim)">Waiting for events...</div>
+      <div class="mini-ev" style="color:var(--dim)">Awaiting telemetry...</div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════ MAIN AREA ════════════════════════════ -->
 <main class="main-area">
+  <!-- PAGE 1: EDR OVERVIEW (ACTIVE) -->
+  <div id="page-edr" class="page-content active">
+    <div style="display:flex; flex:1; overflow:hidden;">
+        <section class="edr-panel">
+          <div class="col-headers">
+            <div class="col-header">Endpoint</div>
+            <div class="col-header">MAC / OUI</div>
+            <div class="col-header">Fingerprint</div>
+            <div class="col-header">Vulnerabilities</div>
+            <div class="col-header">Network State</div>
+            <div class="col-header" style="text-align: right;">Risk</div>
+            <div class="col-header" style="text-align: center;">Controls</div>
+          </div>
+          <div class="device-list" id="device-list">
+            <div class="state-msg">No devices found. Run a scan.</div>
+          </div>
+        </section>
 
-  <!-- EDR ASSET REGISTRY -->
-  <section class="edr-panel">
-    <div class="panel-header">
-      <span class="panel-title">&#x25CB; EDR Asset Registry &middot; <span id="ep-count">0</span> endpoints</span>
-      <div class="legend">
-        <div class="legend-item"><span style="color:var(--red)">&#x25CF;</span> Critical</div>
-        <div class="legend-item"><span style="color:var(--orange)">&#x25CF;</span> Warn</div>
-        <div class="legend-item"><span style="color:var(--green)">&#x25CF;</span> Secure</div>
-        <div class="legend-item"><span style="color:var(--dim)">&#x25CF;</span> Isolated</div>
+        <aside class="event-sidebar">
+          <div class="sidebar-hdr">
+            <span class="sidebar-title">&#x25C8; Live Event Stream</span>
+          </div>
+          <div class="event-list" id="event-list"></div>
+        </aside>
+    </div>
+  </div>
+
+  <!-- PAGE 2: THREAT INTEL -->
+  <div id="page-threat" class="page-content">
+      <div class="state-msg" style="padding-top:100px;">
+          <h2 style="color:var(--text); margin-bottom:10px;">Threat Intelligence Center</h2>
+          <p>Global vulnerability mapping and EPSS probability engine.</p>
       </div>
-    </div>
-    <div class="col-headers">
-      <div class="col-header">Endpoint</div>
-      <div class="col-header">MAC / OUI</div>
-      <div class="col-header">Fingerprint</div>
-      <div class="col-header">Vulnerabilities</div>
-      <div class="col-header">Risk</div>
-      <div class="col-header">Mitigation</div>
-    </div>
-    <div class="device-list" id="device-list">
-      <div class="state-msg">No devices found. Run a scan.</div>
-    </div>
-  </section>
+  </div>
 
-  <!-- LIVE EVENT STREAM SIDEBAR -->
-  <aside class="event-sidebar">
-    <div class="sidebar-hdr">
-      <span class="sidebar-title">&#x25C8; Live Event Stream</span>
-      <span class="live-badge"><span class="live-badge-dot">&#x25CF;</span> LIVE</span>
-    </div>
-    <div class="event-list" id="event-list"></div>
-  </aside>
+  <!-- PAGE 3: NETWORK ANALYZER -->
+  <div id="page-network" class="page-content">
+      <div class="state-msg" style="padding-top:100px;">
+          <h2 style="color:var(--text); margin-bottom:10px;">Network Traffic Analyzer</h2>
+          <p>Live Scapy packet anomaly visualization.</p>
+      </div>
+  </div>
 
+  <!-- PAGE 4: POLICIES -->
+  <div id="page-policy" class="page-content">
+      <div class="state-msg" style="padding-top:100px;">
+          <h2 style="color:var(--text); margin-bottom:10px;">Mitigation Policies</h2>
+          <p>Automated ARP poisoning triggers and device whitelists.</p>
+      </div>
+  </div>
 </main>
 
-<!-- ═══════════ FOOTER ═══════════════════════════════ -->
 <footer class="footer">
-  <span class="footer-text">SIN V1.0 &middot; Glass Cockpit Build &middot; Tier-1 SOC EDR</span>
+  <span class="footer-text">SIN V1.5 &middot; Elastic Slate Build &middot; Rich Forensics Enabled</span>
 </footer>
 
 <script>
   const API = "/api";
   const API_KEY = "a634fd2d20eb8dd013eab32bdbf9529694abb5e46a35dd92d531faf34f1f0291";
 
-  // ── State ───────────────────────────────────────────
-  var devices     = [];
-  var events      = [];
-  var scanning    = false;
-  var scanTimer   = null;
-  var uptimeSecs  = 0;
-  var expandedIPs = new Set();
-  var auditCache  = {};
-  var seenEvKeys  = new Set();
-  var topEvKey    = null;
+  var devices = []; var events = []; var scanning = false; var scanTimer = null;
+  var uptimeSecs = 0; var expandedIPs = new Set(); var auditCache = {};
+  var seenEvKeys = new Set(); var topEvKey = null;
 
-  // ── Uptime ──────────────────────────────────────────
+  function switchPage(pageId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + pageId).classList.add('active');
+  }
+
   setInterval(function() {
     uptimeSecs++;
     var h = String(Math.floor(uptimeSecs / 3600)).padStart(2, '0');
     var m = String(Math.floor((uptimeSecs % 3600) / 60)).padStart(2, '0');
     var s = String(uptimeSecs % 60).padStart(2, '0');
-    var el = document.getElementById('stat-uptime');
-    if (el) el.textContent = h + ':' + m + ':' + s;
+    document.getElementById('stat-uptime').textContent = h + ':' + m + ':' + s;
   }, 1000);
 
-  // ── Fetch all ───────────────────────────────────────
-  function fetchAll() {
-    fetchDevices();
-    fetchEvents();
-    fetchStats();
-  }
+  function fetchAll() { fetchDevices(); fetchEvents(); fetchStats(); }
 
   function fetchDevices() {
     fetch(API + '/devices', {headers: {'X-API-Key': API_KEY}})
       .then(function(r) { if (!r.ok) throw 0; return r.json(); })
       .then(function(d) { devices = d; renderDevices(); })
-      .catch(function() {
-        var el = document.getElementById('device-list');
-        if (el) el.innerHTML = '<div class="state-msg err">&#x26A0; Cannot reach API</div>';
-      });
+      .catch(function() { document.getElementById('device-list').innerHTML = '<div class="state-msg" style="color:var(--red)">&#x26A0; Cannot reach API</div>'; });
   }
 
   function fetchEvents() {
     fetch(API + '/events', {headers: {'X-API-Key': API_KEY}})
       .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) {
-        events = d.slice().sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
-        renderEvents();
-      })
+      .then(function(d) { events = d.slice().sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); }); renderEvents(); })
       .catch(function() {});
   }
 
@@ -667,355 +393,159 @@
     fetch(API + '/stats', {headers: {'X-API-Key': API_KEY}})
       .then(function(r) { if (!r.ok) throw 0; return r.json(); })
       .then(function(s) {
-        var t = document.getElementById('stat-total');
-        var c = document.getElementById('stat-critical');
-        var m = document.getElementById('stat-mit');
-        if (t) t.textContent = s.total_devices      != null ? s.total_devices      : '—';
-        if (c) c.textContent = s.critical_devices   != null ? s.critical_devices   : '—';
-        if (m) m.textContent = s.active_mitigations != null ? s.active_mitigations : '—';
+        document.getElementById('stat-total').textContent = s.total_devices != null ? s.total_devices : '—';
+        document.getElementById('stat-critical').textContent = s.critical != null ? s.critical : '—';
+        document.getElementById('stat-mit').textContent = s.isolated != null ? s.isolated : '—';
         if (s.scanning && !scanning) startScanPoll();
-      })
-      .catch(function() {});
+      }).catch(function() {});
   }
 
-  // ── Render devices ──────────────────────────────────
   function renderDevices() {
     var list = document.getElementById('device-list');
-    var cnt  = document.getElementById('ep-count');
-    if (cnt) cnt.textContent = devices.length;
-
-    if (!devices || devices.length === 0) {
-      list.innerHTML = '<div class="state-msg">No devices found. Run a scan.</div>';
-      return;
-    }
-
+    if (!devices || devices.length === 0) { list.innerHTML = '<div class="state-msg">No devices found. Run a scan.</div>'; return; }
     list.innerHTML = devices.map(buildRow).join('');
 
     requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        var fills = list.querySelectorAll('.risk-fill');
-        for (var i = 0; i < fills.length; i++) {
-          fills[i].style.width = fills[i].getAttribute('data-w') + '%';
-        }
-      });
+      var fills = list.querySelectorAll('.risk-fill');
+      for (var i = 0; i < fills.length; i++) fills[i].style.width = fills[i].getAttribute('data-w') + '%';
     });
   }
 
   function buildRow(d) {
-    var id     = sid(d.ip_address);
-    var isOpen = expandedIPs.has(d.ip_address);
-    var score  = d.risk_score != null ? d.risk_score : 0;
-    var lvl    = (d.risk_level || '').toUpperCase();
+    var id = sid(d.ip_address); var isOpen = expandedIPs.has(d.ip_address);
+    var score = d.risk_score != null ? d.risk_score : 0; var lvl = (d.risk_level || '').toUpperCase();
+    var isIso = d.status === 'mitigated';
 
-    var rColor = score > 70 ? 'var(--red)' : score > 40 ? 'var(--orange)' : 'var(--green)';
-    var rGrad  = score > 70  ? 'linear-gradient(90deg,#ff3b30,#ff6b35)'
-               : score > 40  ? 'linear-gradient(90deg,#ff9f0a,#ffcc00)'
-               :                'linear-gradient(90deg,#00ff88,#00cc66)';
+    var rColor = score > 70 ? 'var(--red)' : score > 30 ? 'var(--orange)' : 'var(--green)';
+    var fpColor = (lvl === 'CRITICAL' || lvl === 'HIGH') ? 'var(--red)' : lvl === 'MEDIUM' ? 'var(--orange)' : 'var(--green)';
 
-    var fpColor = (lvl === 'CRITICAL' || lvl === 'HIGH') ? 'var(--red)'
-                : lvl === 'MEDIUM' ? 'var(--orange)' : 'var(--green)';
-
-    // Vuln column — show first CVE only
-    var vulnHtml;
+    // Vulnerability Box (Main Row)
+    var vulnHtml = '<div class="alert-box secure"><div class="sev-row"><span style="color:var(--green)">●</span><span class="sev-text" style="color:var(--green)">SECURE</span></div></div>';
+    var allFindingsHtml = '<li class="finding-item" style="color:var(--dim)">No threat heuristics detected.</li>';
+    
     if (d.vulnerabilities && d.vulnerabilities.length > 0) {
-      var v  = d.vulnerabilities[0];
-      var vc = v.severity === 'CRITICAL' ? '#ff3b30' : v.severity === 'HIGH' ? '#ff9f0a' : '#ffcc00';
-      vulnHtml = '<a href="https://nvd.nist.gov/vuln/detail/' + e(v.cve) + '" target="_blank" class="cve-pill">' + e(v.cve) + ' ↗</a>'
-               + '<div class="sev-row"><span class="sev-dot" style="color:' + vc + '">●</span>'
-               + '<span class="sev-text" style="color:' + vc + '">' + e(v.severity) + '</span></div>';
-    } else {
-      vulnHtml = '<div class="secure-badge"><span style="color:var(--green)">●</span> Secure</div>';
+      var topV  = d.vulnerabilities[0]; var isCrit = topV.severity === 'CRITICAL'; var isHigh = topV.severity === 'HIGH';
+      var vClass = isCrit ? 'alert-box crit' : (isHigh ? 'alert-box high' : 'alert-box');
+      var vc = isCrit ? 'var(--red)' : (isHigh ? 'var(--orange)' : 'var(--yellow)');
+      var title = e(topV.cve || topV.type);
+      var kevBadge = topV.in_kev ? '<span style="background:var(--red);color:#fff;padding:2px 4px;border-radius:2px;font-size:8px;">KEV</span>' : '';
+      
+      vulnHtml = '<div class="' + vClass + '">'
+               + '<a href="https://nvd.nist.gov/vuln/detail/' + title + '" target="_blank" class="cve-link" style="color:'+vc+'" onclick="event.stopPropagation();">' + title + ' <div style="display:flex;gap:6px;align-items:center;">'+kevBadge+'<span>↗</span></div></a>'
+               + '<div class="sev-row"><span style="color:' + vc + '">●</span><span class="sev-text" style="color:' + vc + '">' + e(topV.severity) + '</span></div>'
+               + '</div>';
+               
+      // Build Rich Findings for Dropdown
+      allFindingsHtml = d.vulnerabilities.map(function(v) { 
+          var remHtml = '';
+          if (v.remediation && v.remediation.length > 0) {
+              remHtml = '<ul class="rem-list">' + v.remediation.map(r => `<li>${e(r)}</li>`).join('') + '</ul>';
+          }
+          return `<li class="finding-item">
+            <div style="width:100%;">
+                <strong style="color:var(--orange)">${e(v.cve || v.type)}</strong><br>
+                <span style="color:var(--dim); font-size:10px;">${e(v.description)}</span>
+                ${remHtml}
+            </div>
+          </li>`; 
+      }).join('');
     }
 
-    // Findings
-    var findings = (d.risk_reasons || []).map(function(r) {
-      return '<li class="finding-item"><span class="ydot">●</span>' + e(r) + '</li>';
-    }).join('') || '<li class="finding-item" style="color:var(--dim)">No findings</li>';
+    // Network Ports Column
+    var ports = (d.open_ports || []).map(function(p) { return '<span class="port-pill">:' + e(String(p)) + '</span>'; }).join('') || '<span style="color:var(--dim);font-family:\'Roboto Mono\',monospace;font-size:10px">No open ports</span>';
 
-    // Ports
-    var ports = (d.open_ports || []).map(function(p) {
-      return '<span class="port-pill">:' + e(String(p)) + '</span>';
-    }).join('') || '<span style="color:var(--dim);font-family:\'IBM Plex Mono\',monospace;font-size:10px">No open ports</span>';
+    // Model and Firmware Tags
+    var modelStr = (d.model && d.model !== 'Unknown') ? d.model : 'Unknown Model';
+    var serialStr = d.serial_number || d.serial || 'N/A';
+    
+    var hwHtml = '';
+    if(d.firmware && d.firmware !== 'Unknown') hwHtml += '<div class="hw-tag">FW:<br>'+e(d.firmware)+'</div>';
 
-    // CVE detail
-    var cves = (d.vulnerabilities || []).map(function(v) {
-      return '<a href="https://nvd.nist.gov/vuln/detail/' + e(v.cve) + '" target="_blank" class="cve-pill-detail">' + e(v.cve) + '</a>';
-    }).join('') || '<span style="color:var(--dim);font-family:\'IBM Plex Mono\',monospace;font-size:10px">No CVE data</span>';
-
-    var auditText = e(auditCache[d.ip_address] || '');
-    var macAddr   = d.mac_address || '—';
-    var ouiStr    = d.mac_address ? 'OUI ' + e(d.mac_address.substring(0, 8).toUpperCase()) : '—';
-    var ipAttr    = e(d.ip_address);
+    var btnHtml = isIso 
+      ? '<button class="quar-btn restore" onclick="event.stopPropagation();doLift(this)" data-ip="' + e(d.ip_address) + '">RESTORE</button>'
+      : '<button class="quar-btn active" onclick="event.stopPropagation();doQuarantine(this)" data-ip="' + e(d.ip_address) + '">⟁ QUARANTINE</button>';
 
     return '<div class="device-row" id="row-' + id + '">'
-      // Main row
-      + '<div class="device-row-main" onclick="toggleRow(this)" data-ip="' + ipAttr + '" data-sid="' + id + '">'
-        + '<div class="col-endpoint">'
-          + '<span class="chevron' + (isOpen ? ' open' : '') + '" id="chev-' + id + '">›</span>'
-          + '<div>'
-            + '<div class="ip-addr">' + e(d.ip_address) + '</div>'
-            + '<div class="row-hostname">' + e(d.hostname || '—') + '</div>'
-          + '</div>'
-        + '</div>'
-        + '<div class="col-mac">'
-          + '<div class="mac">' + e(macAddr) + '</div>'
-          + '<div class="oui">' + ouiStr + '</div>'
-        + '</div>'
-        + '<div class="col-fp">'
-          + '<span class="fp-dot" style="color:' + fpColor + '">●</span>'
-          + '<div>'
-            + '<div class="fp-vendor">' + e(d.vendor || '—') + '</div>'
-            + '<div class="fp-os">' + e(d.os_family || '—') + '</div>'
-          + '</div>'
-        + '</div>'
+      + '<div class="device-row-main" onclick="toggleRow(this)" data-ip="' + e(d.ip_address) + '" data-sid="' + id + '">'
+        + '<div class="col-endpoint"><span class="chevron' + (isOpen ? ' open' : '') + '" id="chev-' + id + '">›</span><div><div class="ip-addr">' + e(d.ip_address) + '</div><div class="row-hostname">' + e(modelStr) + '</div></div></div>'
+        + '<div class="col-mac"><div class="mac">' + e(d.mac_address || '—') + '</div><div class="oui">' + (d.mac_address && d.mac_address !== 'Unknown' ? 'OUI ' + e(d.mac_address.substring(0,8).toUpperCase()) : 'OUI UNKNOWN') + '</div></div>'
+        + '<div class="col-fp"><span class="fp-dot" style="color:' + fpColor + '">●</span><div style="min-width:0; width:100%;"><div class="fp-vendor">' + e(d.manufacturer || d.vendor || 'UNKNOWN') + '</div><div class="fp-os">' + e(d.os_family || 'Unknown') + '</div>' + hwHtml + '</div></div>'
         + '<div class="col-vulns">' + vulnHtml + '</div>'
-        + '<div class="col-risk">'
-          + '<div class="risk-track"><div class="risk-fill" data-w="' + score + '" style="background:' + rGrad + '"></div></div>'
-          + '<span class="risk-num" style="color:' + rColor + '">' + score + '</span>'
-        + '</div>'
-        + '<div class="col-mit">'
-          + '<button class="quar-btn" onclick="event.stopPropagation();doQuarantine(this)" data-ip="' + ipAttr + '">�  Quarantine</button>'
-        + '</div>'
+        + '<div class="col-network">' + ports + '</div>'
+        + '<div class="col-risk"><div class="risk-track"><div class="risk-fill" data-w="' + score + '" style="background:' + rColor + '"></div></div><span class="risk-num" style="color:' + rColor + '">' + score + '</span></div>'
+        + '<div class="col-mit">' + btnHtml + '</div>'
       + '</div>'
-      // Expanded detail
       + '<div class="device-detail' + (isOpen ? ' open' : '') + '" id="det-' + id + '">'
         + '<div class="detail-col">'
-          + '<div class="detail-hdr">⊟ Heuristic Findings</div>'
-          + '<ul class="finding-list">' + findings + '</ul>'
+            + '<div class="detail-hdr">⊟ Identity & Routing</div>'
+            + '<div class="id-grid">'
+                + '<div class="id-lbl">IP Address</div><div class="id-val">' + e(d.ip_address) + '</div>'
+                + '<div class="id-lbl">MAC Addr</div><div class="id-val">' + e(d.mac_address) + '</div>'
+                + '<div class="id-lbl">Vendor</div><div class="id-val">' + e(d.manufacturer || d.vendor || 'Unknown') + '</div>'
+                + '<div class="id-lbl">Model</div><div class="id-val">' + e(modelStr) + '</div>'
+                + '<div class="id-lbl">OS Family</div><div class="id-val">' + e(d.os_family || 'Unknown') + '</div>'
+                + '<div class="id-lbl">Hostname</div><div class="id-val">' + e(d.hostname || 'Unknown') + '</div>'
+                + '<div class="id-lbl">Serial</div><div class="id-val">' + e(serialStr) + '</div>'
+                + '<div class="id-lbl">Discovery</div><div class="id-val">' + e(d.scan_method || 'Go Sensor') + '</div>'
+            + '</div>'
         + '</div>'
         + '<div class="detail-col">'
-          + '<div class="detail-hdr">⌖ Open Port Map</div>'
-          + '<div class="port-grid">' + ports + '</div>'
-          + '<div class="detail-sub">CVE Intelligence</div>'
-          + '<div class="cve-grid">' + cves + '</div>'
+            + '<div class="detail-hdr">⌖ Threat Forensics & Remediation</div>'
+            + '<ul class="finding-list">' + allFindingsHtml + '</ul>'
         + '</div>'
-        + '<div class="detail-col">'
-          + '<div class="detail-hdr-row">'
-            + '<span class="detail-hdr">◎ AI Audit · Claude Sonnet 4.5</span>'
-            + '<button class="audit-run-btn" onclick="doAudit(this)" data-ip="' + ipAttr + '" data-sid="' + id + '">✶ Run Audit</button>'
-          + '</div>'
-          + '<textarea class="audit-out" id="audit-' + id + '" readonly placeholder="Click Run Audit to analyze this endpoint...">' + auditText + '</textarea>'
-        + '</div>'
+        + '<div class="detail-col"><div class="detail-hdr-row"><span class="detail-hdr" style="margin:0;">◎ AI Analyst Console</span><button class="audit-run-btn" onclick="doAudit(this)" data-ip="' + e(d.ip_address) + '" data-sid="' + id + '">✦ Initialize</button></div><textarea class="audit-out" id="audit-' + id + '" readonly placeholder="Awaiting analyst initialization...">' + e(auditCache[d.ip_address] || '') + '</textarea></div>'
       + '</div>'
     + '</div>';
   }
 
-  // ── Toggle expand ───────────────────────────────────
   function toggleRow(el) {
     var ip  = el.getAttribute('data-ip');
     var id  = el.getAttribute('data-sid');
     var det  = document.getElementById('det-'  + id);
     var chev = document.getElementById('chev-' + id);
     if (!det || !chev) return;
-
-    if (expandedIPs.has(ip)) {
-      expandedIPs.delete(ip);
-      det.classList.remove('open');
-      chev.classList.remove('open');
-    } else {
-      expandedIPs.add(ip);
-      det.classList.add('open');
-      chev.classList.add('open');
-    }
+    if (expandedIPs.has(ip)) { expandedIPs.delete(ip); det.classList.remove('open'); chev.classList.remove('open'); } 
+    else { expandedIPs.add(ip); det.classList.add('open'); chev.classList.add('open'); }
   }
 
-  // ── Render events ───────────────────────────────────
   function renderEvents() {
-    var sidebar   = document.getElementById('event-list');
-    var miniEl    = document.getElementById('mini-events');
+    var sidebar = document.getElementById('event-list'); var miniEl = document.getElementById('mini-events');
     var displayed = events.slice(0, 100);
-    var newKeys   = new Set(displayed.map(evKey));
-    var newTop    = displayed[0] ? evKey(displayed[0]) : null;
-    var hasNewTop = newTop !== topEvKey;
-
     sidebar.innerHTML = displayed.map(function(ev) {
-      return buildEvEntry(ev, !seenEvKeys.has(evKey(ev)));
+      var tClass = (ev.severity === 'CRITICAL' || ev.severity === 'HIGH') ? 'ev-type warn' : 'ev-type info';
+      return '<div class="ev-entry"><div class="ev-line1"><span class="ev-ts">' + e(fmtTs(ev.timestamp)) + '</span><span class="' + tClass + '">' + e(ev.event_type || 'EVENT') + '</span></div><div class="ev-line2"><strong style="color:var(--text)">' + e(ev.ip_address || '') + '</strong> ' + e(ev.description || '') + '</div></div>';
     }).join('');
-
-    if (displayed.length === 0) {
-      miniEl.innerHTML = '<div class="mini-ev" style="color:var(--dim)">Waiting for events...</div>';
-    } else {
-      miniEl.innerHTML = displayed.slice(0, 2).map(buildMiniEv).join('');
-    }
-
-    seenEvKeys = newKeys;
-    topEvKey   = newTop;
-    if (hasNewTop) sidebar.scrollTop = 0;
+    if (displayed.length === 0) miniEl.innerHTML = '<div class="mini-ev" style="color:var(--dim)">Awaiting telemetry...</div>';
+    else miniEl.innerHTML = displayed.slice(0, 2).map(function(ev) { return '<div class="mini-ev"><span style="color:var(--blue)">' + e(fmtTs(ev.timestamp)) + '</span> <span style="color:var(--text)">' + e(ev.ip_address || '') + '</span> ' + e(ev.description || '') + '</div>'; }).join('');
   }
 
-  function evKey(ev) { return ev.timestamp + '|' + ev.ip_address + '|' + ev.event_type; }
+  function fmtTs(ts) { try { return new Date(ts).toLocaleTimeString('en-US', { hour12: false }); } catch (err) { return String(ts); } }
+  function e(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+  function sid(ip) { return String(ip).replace(/[^a-zA-Z0-9]/g, '_'); }
 
-  var EV_COLORS = {
-    HEARTBEAT:  'var(--blue)',
-    MITIGATION: 'var(--orange)',
-    CONNECTED:  'var(--green)',
-    WARNING:    'var(--red)',
-    DRIFT:      'var(--yellow)'
-  };
+  function triggerScan() { fetch(API + '/scan/trigger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subnet: document.getElementById('subnet-input').value.trim() }) }).then(startScanPoll); }
+  function startScanPoll() { scanning = true; if (!scanTimer) scanTimer = setInterval(pollScan, 2000); }
+  function pollScan() { fetch(API + '/scan/status', {headers: {'X-API-Key': API_KEY}}).then(r => r.json()).then(d => { if (!d.scanning) { scanning = false; clearInterval(scanTimer); scanTimer = null; fetchAll(); } }); }
+  function doQuarantine(btn) { fetch(API + '/agent/isolate/' + btn.getAttribute('data-ip'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY } }).then(fetchAll); }
+  function doLift(btn) { fetch(API + '/agent/lift/' + btn.getAttribute('data-ip'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY } }).then(fetchAll); }
 
-  function evColor(type) { return EV_COLORS[(type || '').toUpperCase()] || 'var(--dim)'; }
-
-  function fmtTs(ts) {
-    if (!ts) return '--:--:--';
-    try { return new Date(ts).toLocaleTimeString('en-US', { hour12: false }); }
-    catch (err) { return String(ts); }
-  }
-
-  function buildEvEntry(ev, isNew) {
-    var c = evColor(ev.event_type);
-    return '<div class="ev-entry' + (isNew ? ' new-ev' : '') + '">'
-      + '<div class="ev-line1">'
-        + '<span class="ev-ts">'   + e(fmtTs(ev.timestamp))  + '</span>'
-        + '<span class="ev-type" style="color:' + c + '">' + e(ev.event_type || '—') + '</span>'
-        + '<span class="ev-ip">'   + e(ev.ip_address || '')  + '</span>'
-      + '</div>'
-      + '<div class="ev-line2">' + e(ev.description || '') + '</div>'
-    + '</div>';
-  }
-
-  function buildMiniEv(ev) {
-    var c = evColor(ev.event_type);
-    return '<div class="mini-ev">'
-      + '<span style="color:var(--blue)">' + e(fmtTs(ev.timestamp)) + '</span>'
-      + '<span style="color:' + c + ';font-weight:700"> ' + e(ev.event_type || '') + ' </span>'
-      + '<span style="color:var(--dim)">' + e(ev.ip_address || '') + ' ' + e(ev.description || '') + '</span>'
-    + '</div>';
-  }
-
-  // ── Scan ────────────────────────────────────────────
-  function triggerScan() {
-    if (scanning) return;
-    var subnet = document.getElementById('subnet-input').value.trim();
-    var sub    = document.getElementById('stat-uptime-sub');
-    if (sub) sub.textContent = 'Last scan ' + subnet;
-
-    fetch(API + '/scan/trigger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subnet: subnet })
-    })
-    .then(function() { startScanPoll(); })
-    .catch(function() {});
-  }
-
-  function startScanPoll() {
-    scanning = true;
-    setScanBtn(true);
-    if (!scanTimer) scanTimer = setInterval(pollScan, 2000);
-  }
-
-  function pollScan() {
-    fetch(API + '/scan/status', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) {
-        if (!d.scanning) {
-          scanning = false;
-          clearInterval(scanTimer);
-          scanTimer = null;
-          setScanBtn(false);
-          fetchAll();
-        }
-      })
-      .catch(function() {});
-  }
-
-  function setScanBtn(active) {
-    var btn = document.getElementById('scan-btn');
-    if (!btn) return;
-    if (active) {
-      btn.textContent = '⟳ Scanning...';
-      btn.classList.add('scanning');
-      btn.disabled = true;
-    } else {
-      btn.textContent = '⟳ SCAN NOW';
-      btn.classList.remove('scanning');
-      btn.disabled = false;
-    }
-  }
-
-  // ── Quarantine ──────────────────────────────────────
-  function doQuarantine(btn) {
-    var ip = btn.getAttribute('data-ip');
-    fetch(API + '/mitigation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip: ip })
-    })
-    .then(function() { fetchAll(); })
-    .catch(function() {});
-  }
-
-  // ── AI Audit ────────────────────────────────────────
   function doAudit(btn) {
-    var ip   = btn.getAttribute('data-ip');
-    var id   = btn.getAttribute('data-sid');
-    var ta   = document.getElementById('audit-' + id);
-    if (!ta) return;
-    ta.value = 'Running audit...\n';
-
-    fetch(API + '/ai/audit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip: ip })
-    })
-    .then(function(res) {
-      if (res.status === 404) {
-        var cur = document.getElementById('audit-' + id);
-        if (cur) cur.value = 'AI audit not available';
-        auditCache[ip] = 'AI audit not available';
-        return;
-      }
-      if (!res.ok) {
-        var cur = document.getElementById('audit-' + id);
-        if (cur) cur.value = 'Error running audit';
-        auditCache[ip] = 'Error running audit';
-        return;
-      }
-
-      var reader  = res.body.getReader();
-      var decoder = new TextDecoder();
-      var output  = '';
-
-      var cur2 = document.getElementById('audit-' + id);
-      if (cur2) cur2.value = '';
-
-      function pump() {
-        return reader.read().then(function(chunk) {
-          if (chunk.done) return;
-          output += decoder.decode(chunk.value, { stream: true });
-          auditCache[ip] = output;
-          var el = document.getElementById('audit-' + id);
-          if (el) { el.value = output; el.scrollTop = el.scrollHeight; }
-          return pump();
-        });
-      }
-
-      return pump();
-    })
-    .catch(function() {
-      var el  = document.getElementById('audit-' + id);
-      var msg = 'Error: failed to run audit';
-      if (el) el.value = msg;
-      auditCache[ip] = msg;
+    var ip = btn.getAttribute('data-ip'); var id = btn.getAttribute('data-sid');
+    var ta = document.getElementById('audit-' + id); if (!ta) return;
+    ta.value = 'Initializing AI Analysis...\n';
+    fetch(API + '/ai/audit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY }, body: JSON.stringify({ ip_address: ip }) })
+    .then(res => res.json())
+    .then(data => {
+      var txt = data.findings ? JSON.stringify(data.findings, null, 2) : (data.error || 'Done.');
+      var el = document.getElementById('audit-' + id);
+      if (el) el.value = txt; auditCache[ip] = txt;
+    }).catch(() => {
+      var el = document.getElementById('audit-' + id);
+      if (el) el.value = 'Failed to connect to AI engine.';
     });
   }
 
-  // ── Utilities ───────────────────────────────────────
-  function sid(ip) { return String(ip).replace(/[^a-zA-Z0-9]/g, '_'); }
-
-  function e(str) {
-    if (str == null) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  // ── Init ────────────────────────────────────────────
-  fetchAll();
-  setInterval(fetchAll, 30000);
+  fetchAll(); setInterval(fetchAll, 10000);
 </script>
 </body>
 </html>
