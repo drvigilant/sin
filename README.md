@@ -74,12 +74,11 @@ SIN follows a **decoupled, asynchronous microservices design**:
 git clone https://github.com/drvigilant/sin.git
 cd sin
 
-### 2. Configure Environment
-```bash
+#### 2. Configure Environment
 cp .env.example .env
 Edit .env and add required secrets.
 
-### 3. Deploy Stack
+#### 3. Deploy Stack
 ``bash
 docker compose up -d --build
 
