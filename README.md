@@ -73,7 +73,7 @@ SIN follows a **decoupled, asynchronous microservices design**:
 ```bash
 git clone https://github.com/drvigilant/sin.git
 cd sin
-```bash
+```
 
 ---
 
