@@ -73,11 +73,11 @@ SIN follows a **decoupled, asynchronous microservices design**:
 ```bash
 git clone https://github.com/drvigilant/sin.git
 cd sin
-
+---
 ### 2. Configure Environment
 cp .env.example .env
 Edit .env and add required secrets.
-
+---
 #### 3. Deploy Stack
 ``bash
 docker compose up -d --build
@@ -87,12 +87,12 @@ Nginx frontend
 FastAPI backend
 Celery workers
 Redis + Database
-
+---
 ### 4. Access Dashboard
 ```bash
 http://localhost
 ⚙️ Configuration
-
+---
 ### Key environment variables:
 
 Variable	Description	Default
@@ -100,7 +100,7 @@ SIN_API_KEY	API authentication key	Required
 SIN_CONFIDENCE_THRESHOLD	Risk score threshold (0–1) for auto-quarantine	0.80
 SIN_REDIS_HOST	Redis host for task queue	redis
 OLLAMA_URL	AI analyst endpoint	http://ollama:11434
-
+---
 ### 💻 API Usage
 
 SIN is API-first — everything in the UI can be triggered programmatically.
@@ -110,11 +110,11 @@ curl -X POST http://localhost:8000/scan/trigger \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your_api_key" \
   -d '{"subnet": "192.168.30"}'
-
+---
 ### Check Agent Status
 curl http://localhost:8000/agent/status \
   -H "X-API-Key: your_api_key"
-
+---
 ### 🛠️ Troubleshooting
 
 ### ❌ "CANNOT REACH API"
@@ -123,32 +123,32 @@ docker compose ps
 Check logs:
 docker compose logs api
 Ensure API key consistency between frontend and .env
-
+---
 ### ⚠️ Devices Showing "Unknown Model"
 Ensure ONVIF / ISAPI is enabled on target devices
 Check worker logs:
 docker compose logs worker -f
-
+---
 ### 🔄 Schema / Migration Issues
 docker compose down -v
 docker compose up -d --build
-
+---
 ### 🔐 Security Notes
 ARP-based mitigation can disrupt networks if misconfigured
 Always test in a controlled environment before production deployment
 Use strict API key management
-
+---
 ### 🧭 Roadmap (Suggested)
  Role-Based Access Control (RBAC)
  Multi-tenant SOC support
  SIEM integrations (Splunk / Elastic)
  Advanced anomaly detection (ML models)
  Agent-based endpoint telemetry
-
+---
 ### 🤝 Contributing
 
 Pull requests, issues, and security discussions are welcome.
-
+---
 ### 📜 License
 
 MIT License (or specify your license)
