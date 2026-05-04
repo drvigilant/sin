@@ -122,40 +122,60 @@ curl http://localhost:8000/agent/status \
   -H "X-API-Key: your_api_key"
 
 ---
+
 ### 🛠️ Troubleshooting
 
-### ❌ "CANNOT REACH API"
+#### ❌ "CANNOT REACH API"
+
 Verify containers:
 docker compose ps
 Check logs:
 docker compose logs api
 Ensure API key consistency between frontend and .env
+
 ---
-### ⚠️ Devices Showing "Unknown Model"
+
+#### ⚠️ Devices Showing "Unknown Model"
+
 Ensure ONVIF / ISAPI is enabled on target devices
 Check worker logs:
 docker compose logs worker -f
+
 ---
-### 🔄 Schema / Migration Issues
+
+#### 🔄 Schema / Migration Issues
+
+```bash
 docker compose down -v
 docker compose up -d --build
+```
+
 ---
-### 🔐 Security Notes
+
+#### 🔐 Security Notes
+
 ARP-based mitigation can disrupt networks if misconfigured
 Always test in a controlled environment before production deployment
 Use strict API key management
+
 ---
+
 ### 🧭 Roadmap (Suggested)
- Role-Based Access Control (RBAC)
- Multi-tenant SOC support
- SIEM integrations (Splunk / Elastic)
- Advanced anomaly detection (ML models)
- Agent-based endpoint telemetry
+
+- Role-Based Access Control (RBAC)
+- Multi-tenant SOC support
+- SIEM integrations (Splunk / Elastic)
+- Advanced anomaly detection (ML models)
+- Agent-based endpoint telemetry
+
 ---
+
 ### 🤝 Contributing
 
 Pull requests, issues, and security discussions are welcome.
+
 ---
+
 ### 📜 License
 
 MIT License (or specify your license)
