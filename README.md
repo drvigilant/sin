@@ -80,45 +80,47 @@ cd sin
 ```bash
 cp .env.example .env
 ```
-Edit .env and add required secrets.
+#### Edit .env and add required secrets.
 ---
 ### 3. Deploy Stack
 ```bash
 docker compose up -d --build
 ```
-This will start:
-Nginx frontend
-FastAPI backend
-Celery workers
-Redis + Database
+#### This will start: Nginx frontend, FastAPI backend, Celery workers, Redis + Database
 ---
 ### 4. Access Dashboard
 ```bash
 http://localhost
 ```
+
 ⚙️ Configuration
 ---
 ### Key environment variables:
 
-Variable	Description	Default
-SIN_API_KEY	API authentication key	Required
-SIN_CONFIDENCE_THRESHOLD	Risk score threshold (0–1) for auto-quarantine	0.80
-SIN_REDIS_HOST	Redis host for task queue	redis
-OLLAMA_URL	AI analyst endpoint	http://ollama:11434
+- Variable	Description	Default
+- SIN_API_KEY	API authentication key	Required
+- SIN_CONFIDENCE_THRESHOLD	Risk score threshold (0–1) for auto-quarantine	0.80
+- SIN_REDIS_HOST	Redis host for task queue	redis
+- OLLAMA_URL	AI analyst endpoint	http://ollama:11434
 ---
+
 ### 💻 API Usage
 
 SIN is API-first — everything in the UI can be triggered programmatically.
-
+```bash
 Trigger Network Scan
 curl -X POST http://localhost:8000/scan/trigger \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your_api_key" \
   -d '{"subnet": "192.168.30"}'
+```
+
 ---
 ### Check Agent Status
+
 curl http://localhost:8000/agent/status \
   -H "X-API-Key: your_api_key"
+
 ---
 ### 🛠️ Troubleshooting
 
