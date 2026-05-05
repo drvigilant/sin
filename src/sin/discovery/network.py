@@ -172,13 +172,14 @@ class NetworkDiscovery:
             "scan_session_id":  session_id,
             "ip_address":       d.get("ip_address", ""),
             "status":           d.get("status", "online"),
-            "mac_address":      d.get("mac_address") or "Unknown",
-            "hostname":         d.get("hostname") or "Unknown",
+            "mac_address":      d.get("mac_address") or "",
+            "hostname":         d.get("hostname") or "",
 
             # ── Vendor / fingerprint ───────────────────────────────────────
-            "manufacturer":     d.get("manufacturer") or d.get("vendor") or "Unknown",
-            "vendor":           d.get("vendor") or d.get("manufacturer") or "Unknown",
-            "os_family":        d.get("os_family", "Embedded Linux"),
+            "manufacturer":     d.get("manufacturer") or d.get("vendor") or "",
+            "vendor":           d.get("vendor") or d.get("manufacturer") or "",
+            # Keep unknown OS empty to avoid false IoT classification from defaults.
+            "os_family":        d.get("os_family") or "",
             "device_type":      d.get("device_type", "unknown"),
             "model":            d.get("model", ""),
 

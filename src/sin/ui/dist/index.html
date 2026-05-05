@@ -11,32 +11,33 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      /* SentinelOne / Elastic Slate Blue Theme */
-      --bg:        #06090e; 
-      --panel:     #0d1117; 
+      --bg:        #06090e;
+      --panel:     #0d1117;
       --detail-bg: #090c10;
       --hover:     #161b22;
-      --border:    #30363d; 
-      --text:      #e6edf3; 
-      --dim:       #8b949e; 
-      
-      --red:       #f85149; 
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --dim:       #8b949e;
+
+      --red:       #f85149;
       --red-bg:    rgba(248, 81, 73, 0.1);
       --red-border:rgba(248, 81, 73, 0.4);
-      --orange:    #d29922; 
+      --orange:    #d29922;
       --orange-bg: rgba(210, 153, 34, 0.1);
       --orange-border: rgba(210, 153, 34, 0.4);
-      --green:     #2ea043; 
+      --green:     #2ea043;
       --green-bg:  rgba(46, 160, 67, 0.1);
       --blue:      #58a6ff;
-      --claude:    #d97757; /* Anthropic Claude Color */
-      
-      --row-grid:  150px 120px 200px 1.2fr 1.2fr 110px 110px; 
+      --claude:    #d97757;
+
+      --row-grid:  150px 120px 200px 1.2fr 1.2fr 110px 110px;
     }
 
     body {
       background: var(--bg); color: var(--text); font-family: 'Roboto', sans-serif;
-      height: 100vh; display: flex; flex-direction: column; overflow: hidden; -webkit-font-smoothing: antialiased;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -44,7 +45,6 @@
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
 
-    /* ── TOPBAR & TABS ──────────────────────────────── */
     .topbar {
       height: 56px; background: var(--panel); border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; z-index: 100;
@@ -66,93 +66,49 @@
       font-family: 'Roboto Mono', monospace; font-size: 12px; padding: 6px 12px; width: 160px; outline: none; transition: border-color 0.2s;
     }
     .subnet-input:focus { border-color: var(--blue); }
+
     .scan-btn {
       background: transparent; border: 1px solid var(--red); border-radius: 4px; color: var(--red);
       font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.1em; padding: 6px 16px; cursor: pointer; transition: all 0.2s;
+      letter-spacing: 0.1em; padding: 6px 16px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+      min-width: 140px; height: 32px;
+      background-image: linear-gradient(to right, rgba(88, 166, 255, 0.25) 0%, rgba(88, 166, 255, 0.25) 100%);
+      background-size: 0% 100%; background-repeat: no-repeat;
     }
-    .scan-btn:hover:not(:disabled) { background: var(--red-bg); }
-    .scan-btn.scanning { animation: scanPulse 1.5s infinite; border-color: var(--blue); color: var(--blue); }
+    .scan-btn:hover:not(:disabled) { background-color: var(--red-bg); }
+    .scan-btn:disabled { border-color: var(--blue); color: var(--blue); cursor: not-allowed; }
 
-    /* ── STAT CARDS (FIXED GRID LAYOUT) ─────────────── */
-    .stat-cards { 
-        height: 90px; 
-        display: grid; 
-        /* This locks the proportions: 3 equal cards, slightly larger uptime, massive stream */
-        grid-template-columns: 1fr 1fr 1fr 1.2fr 2.5fr; 
-        border-bottom: 1px solid var(--border); 
-        background: var(--panel);
-    }
-    
-    .stat-card {
-        border-right: 1px solid var(--border); 
-        padding: 0 24px;
-        display: flex; 
-        flex-direction: column; 
-        justify-content: center; 
-        gap: 6px;
-        min-width: 0; /* Critical: prevents text from breaking the grid cell */
-    }
+    .stat-cards { height: 90px; display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr 2.5fr; border-bottom: 1px solid var(--border); background: var(--panel); }
+    .stat-card { border-right: 1px solid var(--border); padding: 0 24px; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
     .stat-card:last-child { border-right: none; }
-    
-    .stat-label { 
-        font-family: 'Roboto Mono', monospace; 
-        font-size: 10px; 
-        color: var(--dim); 
-        text-transform: uppercase; 
-        letter-spacing: 0.1em; 
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    
-    .stat-value { 
-        font-size: 32px; 
-        font-weight: 700; 
-        line-height: 1; 
-        font-family: 'Roboto Mono', monospace;
-    }
-    
-    .stat-sub { 
-        font-family: 'Roboto Mono', monospace; 
-        font-size: 10px; 
-        color: var(--dim); 
-        text-transform: uppercase; 
-        letter-spacing: 0.05em; 
-        white-space: nowrap; /* Forces text to stay on one line */
-        overflow: hidden; 
-        text-overflow: ellipsis; /* Adds '...' if monitor is too small */
-    }
+    .stat-card.critical-pulse { animation: criticalPulse 1.6s ease-in-out infinite; }
+    .stat-label { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; white-space: nowrap; }
+    .stat-value { font-size: 32px; font-weight: 700; line-height: 1; font-family: 'Roboto Mono', monospace; }
+    .stat-sub { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .stat-card-stream { justify-content: space-between; padding: 14px 24px; gap: 0; }
     .stream-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;}
     .live-badge { border: 1px solid var(--green); border-radius: 4px; color: var(--green); font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 6px; letter-spacing: 0.08em; }
     .mini-events { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow: hidden; justify-content: flex-start; }
-    .mini-ev { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } 
+    .mini-ev { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ── MAIN AREA & PANEL ──────────────────────────── */
     .main-area { flex: 1; display: flex; overflow: hidden; min-height: 0; background: var(--bg); }
     .page-content { flex: 1; display: none; flex-direction: column; overflow: hidden; }
     .page-content.active { display: flex; }
-
     .edr-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
 
-    /* ── TABLE HEADERS & ROWS ───────────────────────── */
-    .col-headers { 
-        height: 48px; display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 0 24px; 
-        border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--panel); align-items: center; 
-    }
+    .col-headers { height: 48px; display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--panel); align-items: center; }
     .col-header { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;}
 
     .device-list { flex: 1; overflow-y: auto; overflow-x: hidden; }
-
     .device-row { border-bottom: 1px solid var(--border); }
     .device-row-main { display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 16px 24px; cursor: pointer; align-items: start; transition: background 0.15s; }
     .device-row-main:hover { background: var(--hover); }
 
-    .col-endpoint { display: flex; align-items: flex-start; gap: 8px; } 
+    .col-endpoint { display: flex; align-items: flex-start; gap: 8px; }
     .chevron { color: var(--dim); font-size: 16px; line-height: 1.1; transition: transform 0.2s ease; width: 14px; flex-shrink: 0;}
     .chevron.open { transform: rotate(90deg); }
-    
+
     .ip-addr { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2;}
     .row-hostname { font-size: 11px; color: var(--dim); margin-top: 4px; font-family: 'Roboto Mono', monospace; }
 
@@ -178,13 +134,12 @@
 
     .col-network { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;}
     .port-pill { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 6px; }
-    
+
     .col-risk { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-end; height: 16px;}
     .risk-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
     .risk-fill  { height: 100%; border-radius: 2px; width: 0; transition: width 0.8s; }
     .risk-num   { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
 
-    /* FIXED QUARANTINE BUTTON */
     .col-mit { display: flex; align-items: flex-start; justify-content: flex-end; }
     .quar-btn {
       background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--dim);
@@ -195,12 +150,18 @@
     .quar-btn.active:hover { opacity: 0.85; }
     .quar-btn.restore { border-color: var(--blue); color: var(--blue); }
 
-    /* ── FORENSICS PANEL (RICH DROPDOWN) ────────────── */
+    .white-btn {
+        background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim);
+        font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase;
+        padding: 4px 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+    }
+    .white-btn:hover { border-color: var(--text); color: var(--text); background: rgba(255,255,255,0.05); }
+
     .device-detail { display: grid; grid-template-columns: 300px 1.5fr 1fr; background: var(--detail-bg); max-height: 0; overflow: hidden; transition: max-height 0.3s; }
     .device-detail.open { max-height: 400px; border-top: 1px solid var(--border); box-shadow: inset 0 4px 6px rgba(0,0,0,0.2);}
     .detail-col { padding: 20px 24px; border-right: 1px solid var(--border); overflow-y: auto; }
     .detail-hdr { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; font-weight: 600;}
-    
+
     .id-grid { display: grid; grid-template-columns: 80px 1fr; gap: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 10px; margin-bottom: 16px;}
     .id-lbl { color: var(--dim); }
     .id-val { color: var(--text); font-weight: 600; word-break: break-all;}
@@ -210,16 +171,14 @@
     .rem-list { margin-top: 8px; margin-left: 16px; list-style-type: square; color: var(--dim); }
     .rem-list li { margin-bottom: 4px; }
 
-    /* FIXED AI INITIALIZE BUTTON */
-    .audit-run-btn { 
-        background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim); 
-        font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; 
+    .audit-run-btn {
+        background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim);
+        font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase;
         padding: 4px 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
     }
     .audit-run-btn:hover { border-color: var(--blue); color: var(--blue); }
     .audit-out { width: 100%; height: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--green); font-family: 'Roboto Mono', monospace; font-size: 11px; line-height: 1.6; padding: 12px; resize: none; outline: none; margin-top: 12px;}
 
-    /* ── EVENT SIDEBAR ──────────────────────────────── */
     .event-sidebar { width: 340px; flex-shrink: 0; background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
     .sidebar-hdr { height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .sidebar-title { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;}
@@ -236,10 +195,46 @@
     .footer { height: 36px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; }
     .footer-text { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
     .state-msg { padding: 40px 24px; font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; text-align: center; }
+    .network-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; background: var(--bg); overflow: hidden; }
+    .network-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .network-panel-hdr { height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; flex-shrink: 0; }
+    .network-feed { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .network-row { background: var(--detail-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: 'Roboto Mono', monospace; line-height: 1.4; }
+    .flow-main { color: var(--text); font-size: 12px; }
+    .flow-meta { color: var(--dim); font-size: 10px; margin-top: 4px; }
+    .anomaly-row { border-color: var(--orange-border); background: var(--orange-bg); color: var(--orange); font-size: 11px; }
+    .anomaly-row.critical { border-color: var(--red-border); background: var(--red-bg); color: var(--red); }
+    .threat-grid-wrap { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; }
+    .threat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .threat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 160px; }
+    .threat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .threat-id { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text); }
+    .sev-pill { font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--border); }
+    .sev-pill.CRITICAL, .sev-pill.HIGH { color: var(--red); background: var(--red-bg); border-color: var(--red-border); }
+    .sev-pill.MEDIUM { color: var(--orange); background: var(--orange-bg); border-color: var(--orange-border); }
+    .sev-pill.LOW, .sev-pill.INFO { color: var(--blue); background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.3); }
+    .threat-desc { color: var(--dim); font-size: 12px; line-height: 1.45; flex: 1; }
+    .threat-aff { color: var(--text); font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .policy-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; justify-content: center; }
+    .policy-panel { width: 100%; max-width: 820px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 0; }
+    .policy-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .policy-row:last-child { border-bottom: none; }
+    .policy-meta h3 { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+    .policy-meta p { font-size: 12px; color: var(--dim); line-height: 1.4; }
+    .switch { position: relative; display: inline-block; width: 52px; height: 30px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #2b3139; transition: .2s; border: 1px solid var(--border); border-radius: 999px; }
+    .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; top: 3px; background: #c9d1d9; transition: .2s; border-radius: 50%; }
+    input:checked + .slider { background: var(--green-bg); border-color: rgba(46, 160, 67, 0.5); }
+    input:checked + .slider:before { transform: translateX(22px); background: var(--green); }
+    input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
 
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    @keyframes scanPulse { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px rgba(88, 166, 255, 0.3); border-color: rgba(88, 166, 255, 0.8); } }
     @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes criticalPulse {
+      0% { box-shadow: inset 0 0 0 rgba(248, 81, 73, 0); }
+      50% { box-shadow: inset 0 0 30px rgba(248, 81, 73, 0.18); }
+      100% { box-shadow: inset 0 0 0 rgba(248, 81, 73, 0); }
+    }
   </style>
 </head>
 <body>
@@ -258,7 +253,7 @@
   </div>
   <div class="topbar-right">
     <input id="subnet-input" class="subnet-input" type="text" value="192.168.30.0/24" spellcheck="false">
-    <button id="scan-btn" class="scan-btn" onclick="triggerScan()">&#x27F3; SCAN NOW</button>
+    <button id="scan-btn" class="scan-btn" onclick="triggerScan()">&#x27F2; SCAN NOW</button>
   </div>
 </header>
 
@@ -268,7 +263,7 @@
     <div class="stat-value" id="stat-total">&#8212;</div>
     <div class="stat-sub">Discovered on perimeter</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" id="critical-card">
     <div class="stat-label">Critical Risks</div>
     <div class="stat-value" id="stat-critical" style="color:var(--red)">&#8212;</div>
     <div class="stat-sub">Active threats unmitigated</div>
@@ -294,7 +289,6 @@
 </section>
 
 <main class="main-area">
-  <!-- PAGE 1: EDR OVERVIEW (ACTIVE) -->
   <div id="page-edr" class="page-content active">
     <div style="display:flex; flex:1; overflow:hidden;">
         <section class="edr-panel">
@@ -321,42 +315,81 @@
     </div>
   </div>
 
-  <!-- PAGE 2: THREAT INTEL -->
   <div id="page-threat" class="page-content">
-      <div class="state-msg" style="padding-top:100px;">
-          <h2 style="color:var(--text); margin-bottom:10px;">Threat Intelligence Center</h2>
-          <p>Global vulnerability mapping and EPSS probability engine.</p>
+      <div class="threat-grid-wrap">
+          <div class="threat-grid" id="threat-grid">
+              <div class="state-msg">Loading threat intelligence...</div>
+          </div>
       </div>
   </div>
 
-  <!-- PAGE 3: NETWORK ANALYZER -->
   <div id="page-network" class="page-content">
-      <div class="state-msg" style="padding-top:100px;">
-          <h2 style="color:var(--text); margin-bottom:10px;">Network Traffic Analyzer</h2>
-          <p>Live Scapy packet anomaly visualization.</p>
+      <!-- PAGE 3: NETWORK ANALYZER -->
+      <div class="network-grid">
+        <section class="network-panel">
+          <div class="network-panel-hdr">⚡ Live Traffic Flows</div>
+          <div class="network-feed" id="flow-list">
+            <div class="state-msg" style="padding:20px;">Awaiting live packet flow telemetry...</div>
+          </div>
+        </section>
+        <section class="network-panel">
+          <div class="network-panel-hdr">⚠️ Protocol Anomalies</div>
+          <div class="network-feed" id="anomaly-list">
+            <div class="state-msg" style="padding:20px;">No anomalies detected yet.</div>
+          </div>
+        </section>
       </div>
   </div>
 
-  <!-- PAGE 4: POLICIES -->
   <div id="page-policy" class="page-content">
-      <div class="state-msg" style="padding-top:100px;">
-          <h2 style="color:var(--text); margin-bottom:10px;">Mitigation Policies</h2>
-          <p>Automated ARP poisoning triggers and device whitelists.</p>
+      <div class="policy-wrap">
+          <div class="policy-panel" id="policy-panel">
+              <div class="policy-row">
+                  <div class="policy-meta">
+                      <h3>Auto-Quarantine Critical</h3>
+                      <p>Automatically isolate endpoints when risk score exceeds 90.</p>
+                  </div>
+                  <label class="switch">
+                      <input type="checkbox" id="policy-auto-quarantine" onchange="togglePolicy('auto_quarantine_critical', this.checked, this)">
+                      <span class="slider"></span>
+                  </label>
+              </div>
+              <div class="policy-row">
+                  <div class="policy-meta">
+                      <h3>Network Discovery</h3>
+                      <p>Enable or disable active network discovery scans from SIN.</p>
+                  </div>
+                  <label class="switch">
+                      <input type="checkbox" id="policy-network-discovery" onchange="togglePolicy('network_discovery_enabled', this.checked, this)">
+                      <span class="slider"></span>
+                  </label>
+              </div>
+              <div class="policy-row">
+                  <div class="policy-meta">
+                      <h3>Strict Whitelist Mode</h3>
+                      <p>Restrict operations to explicitly trusted devices only.</p>
+                  </div>
+                  <label class="switch">
+                      <input type="checkbox" id="policy-strict-whitelist" onchange="togglePolicy('strict_whitelist_mode', this.checked, this)">
+                      <span class="slider"></span>
+                  </label>
+              </div>
+          </div>
       </div>
   </div>
 </main>
 
 <footer class="footer">
-  <span class="footer-text">SIN V1.5 &middot; Elastic Slate Build &middot; Rich Forensics Enabled</span>
+  <span class="footer-text">SIN V1.5 &middot; Elastic Slate Build &middot; Multi-Threaded Core</span>
 </footer>
 
 <script>
   const API = "/api";
   const API_KEY = "a634fd2d20eb8dd013eab32bdbf9529694abb5e46a35dd92d531faf34f1f0291";
 
-  var devices = []; var events = []; var scanning = false; var scanTimer = null;
+  var devices = []; var events = []; var threats = []; var policies = {};
+  var scanning = false; var scanTimer = null;
   var uptimeSecs = 0; var expandedIPs = new Set(); var auditCache = {};
-  var seenEvKeys = new Set(); var topEvKey = null;
 
   function switchPage(pageId) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -373,7 +406,7 @@
     document.getElementById('stat-uptime').textContent = h + ':' + m + ':' + s;
   }, 1000);
 
-  function fetchAll() { fetchDevices(); fetchEvents(); fetchStats(); }
+  function fetchAll() { fetchDevices(); fetchEvents(); fetchStats(); fetchThreats(); fetchPolicies(); }
 
   function fetchDevices() {
     fetch(API + '/devices', {headers: {'X-API-Key': API_KEY}})
@@ -396,8 +429,80 @@
         document.getElementById('stat-total').textContent = s.total_devices != null ? s.total_devices : '—';
         document.getElementById('stat-critical').textContent = s.critical != null ? s.critical : '—';
         document.getElementById('stat-mit').textContent = s.isolated != null ? s.isolated : '—';
+        var criticalCard = document.getElementById('critical-card');
+        if (criticalCard) {
+          if ((s.critical || 0) > 0) criticalCard.classList.add('critical-pulse');
+          else criticalCard.classList.remove('critical-pulse');
+        }
         if (s.scanning && !scanning) startScanPoll();
       }).catch(function() {});
+  }
+
+  function fetchThreats() {
+    fetch(API + '/threats', {headers: {'X-API-Key': API_KEY}})
+      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function(d) { threats = Array.isArray(d) ? d : []; renderThreats(); })
+      .catch(function() {
+        var grid = document.getElementById('threat-grid');
+        if (grid) grid.innerHTML = '<div class="state-msg" style="color:var(--red)">Unable to load threat intelligence.</div>';
+      });
+  }
+
+  function renderThreats() {
+    var grid = document.getElementById('threat-grid');
+    if (!grid) return;
+    if (!threats || threats.length === 0) {
+      grid.innerHTML = '<div class="state-msg">No active threats detected.</div>';
+      return;
+    }
+    grid.innerHTML = threats.map(function(t) {
+      var severity = e((t.severity || 'INFO').toUpperCase());
+      return '<article class="threat-card">'
+        + '<div class="threat-top"><div class="threat-id">' + e(t.id || 'Unknown Threat') + '</div><span class="sev-pill ' + severity + '">' + severity + '</span></div>'
+        + '<div class="threat-desc">' + e(t.description || 'No description available.') + '</div>'
+        + '<div class="threat-aff">Affected Endpoints: ' + e(String(t.affected_endpoints || 0)) + '</div>'
+        + '</article>';
+    }).join('');
+  }
+
+  function fetchPolicies() {
+    fetch(API + '/policies', {headers: {'X-API-Key': API_KEY}})
+      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function(d) {
+        policies = d || {};
+        renderPolicies();
+      })
+      .catch(function() {});
+  }
+
+  function renderPolicies() {
+    var autoQ = document.getElementById('policy-auto-quarantine');
+    var netDisc = document.getElementById('policy-network-discovery');
+    var strict = document.getElementById('policy-strict-whitelist');
+    if (autoQ) autoQ.checked = !!policies.auto_quarantine_critical;
+    if (netDisc) netDisc.checked = !!policies.network_discovery_enabled;
+    if (strict) strict.checked = !!policies.strict_whitelist_mode;
+  }
+
+  function togglePolicy(policyName, value, inputEl) {
+    if (inputEl) inputEl.disabled = true;
+    fetch(API + '/policies/' + policyName, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
+      body: JSON.stringify({value: !!value})
+    })
+    .then(function(r) { if (!r.ok) throw 0; return r.json(); })
+    .then(function(resp) {
+      policies = resp.policies || policies;
+      renderPolicies();
+    })
+    .catch(function() {
+      if (inputEl) inputEl.checked = !value;
+      alert('Failed to update policy. Please retry.');
+    })
+    .finally(function() {
+      if (inputEl) inputEl.disabled = false;
+    });
   }
 
   function renderDevices() {
@@ -419,24 +524,22 @@
     var rColor = score > 70 ? 'var(--red)' : score > 30 ? 'var(--orange)' : 'var(--green)';
     var fpColor = (lvl === 'CRITICAL' || lvl === 'HIGH') ? 'var(--red)' : lvl === 'MEDIUM' ? 'var(--orange)' : 'var(--green)';
 
-    // Vulnerability Box (Main Row)
     var vulnHtml = '<div class="alert-box secure"><div class="sev-row"><span style="color:var(--green)">●</span><span class="sev-text" style="color:var(--green)">SECURE</span></div></div>';
     var allFindingsHtml = '<li class="finding-item" style="color:var(--dim)">No threat heuristics detected.</li>';
-    
+
     if (d.vulnerabilities && d.vulnerabilities.length > 0) {
       var topV  = d.vulnerabilities[0]; var isCrit = topV.severity === 'CRITICAL'; var isHigh = topV.severity === 'HIGH';
       var vClass = isCrit ? 'alert-box crit' : (isHigh ? 'alert-box high' : 'alert-box');
       var vc = isCrit ? 'var(--red)' : (isHigh ? 'var(--orange)' : 'var(--yellow)');
       var title = e(topV.cve || topV.type);
       var kevBadge = topV.in_kev ? '<span style="background:var(--red);color:#fff;padding:2px 4px;border-radius:2px;font-size:8px;">KEV</span>' : '';
-      
+
       vulnHtml = '<div class="' + vClass + '">'
                + '<a href="https://nvd.nist.gov/vuln/detail/' + title + '" target="_blank" class="cve-link" style="color:'+vc+'" onclick="event.stopPropagation();">' + title + ' <div style="display:flex;gap:6px;align-items:center;">'+kevBadge+'<span>↗</span></div></a>'
                + '<div class="sev-row"><span style="color:' + vc + '">●</span><span class="sev-text" style="color:' + vc + '">' + e(topV.severity) + '</span></div>'
                + '</div>';
-               
-      // Build Rich Findings for Dropdown
-      allFindingsHtml = d.vulnerabilities.map(function(v) { 
+
+      allFindingsHtml = d.vulnerabilities.map(function(v) {
           var remHtml = '';
           if (v.remediation && v.remediation.length > 0) {
               remHtml = '<ul class="rem-list">' + v.remediation.map(r => `<li>${e(r)}</li>`).join('') + '</ul>';
@@ -447,21 +550,18 @@
                 <span style="color:var(--dim); font-size:10px;">${e(v.description)}</span>
                 ${remHtml}
             </div>
-          </li>`; 
+          </li>`;
       }).join('');
     }
 
-    // Network Ports Column
     var ports = (d.open_ports || []).map(function(p) { return '<span class="port-pill">:' + e(String(p)) + '</span>'; }).join('') || '<span style="color:var(--dim);font-family:\'Roboto Mono\',monospace;font-size:10px">No open ports</span>';
 
-    // Model and Firmware Tags
     var modelStr = (d.model && d.model !== 'Unknown') ? d.model : 'Unknown Model';
     var serialStr = d.serial_number || d.serial || 'N/A';
-    
     var hwHtml = '';
     if(d.firmware && d.firmware !== 'Unknown') hwHtml += '<div class="hw-tag">FW:<br>'+e(d.firmware)+'</div>';
 
-    var btnHtml = isIso 
+    var btnHtml = isIso
       ? '<button class="quar-btn restore" onclick="event.stopPropagation();doLift(this)" data-ip="' + e(d.ip_address) + '">RESTORE</button>'
       : '<button class="quar-btn active" onclick="event.stopPropagation();doQuarantine(this)" data-ip="' + e(d.ip_address) + '">⟁ QUARANTINE</button>';
 
@@ -477,7 +577,10 @@
       + '</div>'
       + '<div class="device-detail' + (isOpen ? ' open' : '') + '" id="det-' + id + '">'
         + '<div class="detail-col">'
-            + '<div class="detail-hdr">⊟ Identity & Routing</div>'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">'
+                + '<div class="detail-hdr" style="margin:0;">⊟ Identity & Routing</div>'
+                + '<button class="white-btn" onclick="doWhitelist(this)" data-ip="' + e(d.ip_address) + '">Ignore Device</button>'
+            + '</div>'
             + '<div class="id-grid">'
                 + '<div class="id-lbl">IP Address</div><div class="id-val">' + e(d.ip_address) + '</div>'
                 + '<div class="id-lbl">MAC Addr</div><div class="id-val">' + e(d.mac_address) + '</div>'
@@ -504,7 +607,7 @@
     var det  = document.getElementById('det-'  + id);
     var chev = document.getElementById('chev-' + id);
     if (!det || !chev) return;
-    if (expandedIPs.has(ip)) { expandedIPs.delete(ip); det.classList.remove('open'); chev.classList.remove('open'); } 
+    if (expandedIPs.has(ip)) { expandedIPs.delete(ip); det.classList.remove('open'); chev.classList.remove('open'); }
     else { expandedIPs.add(ip); det.classList.add('open'); chev.classList.add('open'); }
   }
 
@@ -523,11 +626,51 @@
   function e(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function sid(ip) { return String(ip).replace(/[^a-zA-Z0-9]/g, '_'); }
 
-  function triggerScan() { fetch(API + '/scan/trigger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subnet: document.getElementById('subnet-input').value.trim() }) }).then(startScanPoll); }
+  function triggerScan() {
+      var btn = document.getElementById('scan-btn');
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '⟳ INITIALIZING...';
+          btn.style.backgroundSize = '5% 100%';
+      }
+      fetch(API + '/scan/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+          body: JSON.stringify({ subnet: document.getElementById('subnet-input').value.trim() })
+      }).then(startScanPoll);
+  }
+
   function startScanPoll() { scanning = true; if (!scanTimer) scanTimer = setInterval(pollScan, 2000); }
-  function pollScan() { fetch(API + '/scan/status', {headers: {'X-API-Key': API_KEY}}).then(r => r.json()).then(d => { if (!d.scanning) { scanning = false; clearInterval(scanTimer); scanTimer = null; fetchAll(); } }); }
+
+  function pollScan() {
+      fetch(API + '/scan/status', {headers: {'X-API-Key': API_KEY}})
+        .then(r => r.json())
+        .then(d => {
+            if (!d.scanning) {
+                scanning = false;
+                clearInterval(scanTimer);
+                scanTimer = null;
+                var btn = document.getElementById('scan-btn');
+                if (btn) { btn.disabled = false; btn.innerHTML = '&#x27F2; SCAN NOW'; btn.style.backgroundSize = '0% 100%'; }
+                fetchAll();
+            }
+        });
+  }
+
   function doQuarantine(btn) { fetch(API + '/agent/isolate/' + btn.getAttribute('data-ip'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY } }).then(fetchAll); }
   function doLift(btn) { fetch(API + '/agent/lift/' + btn.getAttribute('data-ip'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY } }).then(fetchAll); }
+  
+  function doWhitelist(btn) { 
+      if(confirm("Permanently ignore this device in future scans?")) {
+          fetch(API + '/agent/whitelist/' + btn.getAttribute('data-ip'), { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY } 
+          }).then(() => {
+              alert("Device added to ignore list.");
+              fetchAll(); 
+          }); 
+      }
+  }
 
   function doAudit(btn) {
     var ip = btn.getAttribute('data-ip'); var id = btn.getAttribute('data-sid');
@@ -545,7 +688,87 @@
     });
   }
 
-  fetchAll(); setInterval(fetchAll, 10000);
+  function prependNetworkRow(listId, html, maxRows) {
+      var list = document.getElementById(listId);
+      if (!list) return;
+      var placeholder = list.querySelector('.state-msg');
+      if (placeholder) placeholder.remove();
+      list.insertAdjacentHTML('afterbegin', html);
+      while (list.children.length > maxRows) list.removeChild(list.lastElementChild);
+  }
+
+  function renderFlowRow(message) {
+      var src = e(message.src || message.source || message.src_ip || 'unknown');
+      var dst = e(message.dst || message.destination || message.dst_ip || 'unknown');
+      var proto = e(message.proto || message.protocol || 'unknown');
+      var ts = e(new Date().toLocaleTimeString('en-US', { hour12: false }));
+      var html = '<div class="network-row">'
+          + '<div class="flow-main">' + src + ' → ' + dst + '</div>'
+          + '<div class="flow-meta">PROTO: ' + proto.toUpperCase() + ' · ' + ts + '</div>'
+          + '</div>';
+      prependNetworkRow('flow-list', html, 50);
+  }
+
+  function renderAnomalyRow(anomaly) {
+      var text = e(typeof anomaly === 'string' ? anomaly : JSON.stringify(anomaly));
+      var lowered = text.toLowerCase();
+      var isCritical = lowered.includes('554') || lowered.includes('80') || lowered.includes('critical') || lowered.includes('insecure');
+      var klass = isCritical ? 'network-row anomaly-row critical' : 'network-row anomaly-row';
+      var html = '<div class="' + klass + '">' + text + '</div>';
+      prependNetworkRow('anomaly-list', html, 50);
+  }
+
+  function initWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const ws = new WebSocket(protocol + window.location.host + '/ws/events');
+
+      ws.onopen = function() {
+          console.log("SOC Event Bus Connected.");
+          document.getElementById('mini-events').innerHTML = '<div class="mini-ev" style="color:var(--green)">Live telemetry stream active...</div>';
+      };
+
+      ws.onmessage = function(event) {
+          const data = JSON.parse(event.data);
+          var btn = document.getElementById('scan-btn');
+
+          if (data.type === "SCAN_START") {
+              if (btn) { btn.disabled = true; btn.innerHTML = '⟳ DISCOVERING...'; btn.style.backgroundSize = '10% 100%'; }
+              const miniEvs = document.getElementById('mini-events');
+              if (miniEvs) miniEvs.innerHTML = '<div class="mini-ev" style="color:var(--blue)">' + e(data.message) + '</div>' + miniEvs.innerHTML;
+          }
+          else if (data.type === "SCAN_PROGRESS") {
+              var prog = JSON.parse(data.message);
+              var pct = prog.total > 0 ? Math.round((prog.current / prog.total) * 100) : 100;
+              if (btn) { btn.innerHTML = 'AUDITING ' + prog.current + '/' + prog.total; btn.style.backgroundSize = Math.max(10, pct) + '% 100%'; }
+          }
+          else if (data.type === "SCAN_COMPLETE") {
+              if (btn) { btn.disabled = false; btn.innerHTML = '&#x27F2; SCAN NOW'; btn.style.backgroundSize = '0% 100%'; }
+              fetchAll();
+          }
+          else if (data.type === "MITIGATION" || data.type === "DRIFT") {
+              fetchAll();
+          }
+          else if (data.type === "FLOW_NEW") {
+              var msg = data.message || {};
+              renderFlowRow(msg);
+              if (msg.anomaly) renderAnomalyRow(msg.anomaly);
+          }
+          else if (data.type === "TRAFFIC_ALERT") {
+              var alertMsg = data.message || {};
+              if (alertMsg.anomaly) renderAnomalyRow(alertMsg.anomaly);
+              else renderAnomalyRow(alertMsg);
+          }
+      };
+
+      ws.onclose = function() {
+          console.log("Event Bus disconnected. Attempting reconnect in 5s...");
+          setTimeout(initWebSocket, 5000);
+      };
+  }
+
+  fetchAll();
+  initWebSocket();
+
 </script>
 </body>
 </html>

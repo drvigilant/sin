@@ -64,3 +64,27 @@ class PacketEngine:
             self.sock.close()
         except Exception:
             pass
+
+
+class PacketSniffer:
+    """
+    Thin runtime wrapper used by API startup hooks.
+    Starts PacketEngine in a background daemon thread.
+    """
+
+    def __init__(self, port: int = 9999):
+        self.engine = PacketEngine(port=port)
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._thread = threading.Thread(
+            target=self.engine.start_capture,
+            name="sin-packet-sniffer",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self.engine.stop()

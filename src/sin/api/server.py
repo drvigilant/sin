@@ -2,16 +2,18 @@ from fastapi import FastAPI, BackgroundTasks, Depends, WebSocket, WebSocketDisco
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 import asyncio
 import httpx
 import json
 import os
+import redis.asyncio as aioredis
 
 from sin.utils.logger import get_logger
 from sin.agent.runner import AgentRunner
 from sin.agent.core import SINAgent
+from sin.agent.packet import PacketSniffer
 from sin.storage.database import SessionLocal
 from sin.storage import models
 
@@ -23,6 +25,12 @@ _AUTH_EXEMPT    = {"/health", "/api/health"}
 
 # ── Shared scan-state via Redis ──
 _SCAN_REDIS_KEY = "sin:scan:running"
+_POLICY_REDIS_KEY = "sin:policies"
+_DEFAULT_POLICIES = {
+    "auto_quarantine_critical": True,
+    "strict_whitelist_mode": False,
+    "network_discovery_enabled": True,
+}
 
 def _redis_client():
     try:
@@ -63,12 +71,14 @@ app = FastAPI(title="SIN Enterprise API")
 
 # ── Global Agent Instance ──
 _sin_agent = None
+_packet_sniffer: PacketSniffer | None = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the SIN Agent when the API starts."""
-    global _sin_agent
+    global _sin_agent, _packet_sniffer
     _sin_agent = SINAgent()
+    _packet_sniffer = PacketSniffer()
+    _packet_sniffer.start()
     logger.info("SIN Agent initialized in API context.")
 
 app.add_middleware(
@@ -80,7 +90,6 @@ app.add_middleware(
 
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
-    # CRITICAL FIX: Allow 'OPTIONS' and exempt paths to pass through
     if request.method == "OPTIONS" or request.url.path in _AUTH_EXEMPT:
         return await call_next(request)
 
@@ -112,7 +121,40 @@ class OllamaAuditRequest(BaseModel):
     vendor: str = ""
     os_family: str = ""
     hostname: str = ""
-    vulnerabilities: list = []  # Added to prevent silent dropping of data
+    vulnerabilities: list = []
+
+
+class PolicyToggleRequest(BaseModel):
+    value: bool
+
+
+def _load_policies() -> Dict[str, bool]:
+    policies = dict(_DEFAULT_POLICIES)
+    r = _redis_client()
+    if not r:
+        return policies
+    try:
+        raw = r.get(_POLICY_REDIS_KEY)
+        if raw:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                for key in _DEFAULT_POLICIES.keys():
+                    if key in parsed:
+                        policies[key] = bool(parsed[key])
+    except Exception as exc:
+        logger.warning(f"Failed to load policies from Redis: {exc}")
+    return policies
+
+
+def _save_policies(policies: Dict[str, bool]) -> None:
+    r = _redis_client()
+    if not r:
+        return
+    try:
+        payload = {k: bool(v) for k, v in policies.items()}
+        r.set(_POLICY_REDIS_KEY, json.dumps(payload))
+    except Exception as exc:
+        logger.warning(f"Failed to save policies to Redis: {exc}")
 
 def run_scan_job(subnet: str):
     _set_scan_running(True)
@@ -130,6 +172,16 @@ def health_check():
 
 @app.post("/scan/trigger")
 def trigger_network_scan(request: ScanRequest, background_tasks: BackgroundTasks):
+    if not _load_policies().get("network_discovery_enabled", True):
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "Network discovery is disabled by policy."}
+        )
+    if _is_scan_running():
+        return JSONResponse(
+            status_code=429,
+            content={"status": "error", "message": "Scan already in progress. Please wait."}
+        )
     target = request.subnet or "192.168.30"
     background_tasks.add_task(run_scan_job, target)
     return {"status": "success", "message": f"Scan dispatched for {target}"}
@@ -172,6 +224,86 @@ def get_devices(db: Session = Depends(get_db)):
 def get_events(db: Session = Depends(get_db)):
     rows = db.query(models.SecurityEvent).order_by(models.SecurityEvent.timestamp.desc()).limit(200).all()
     return [{"ip_address": e.ip_address, "event_type": e.event_type, "severity": e.severity, "description": e.description, "timestamp": e.timestamp.isoformat() if e.timestamp else ""} for e in rows]
+
+
+@app.get("/threats")
+def get_threats(db: Session = Depends(get_db)):
+    severity_rank = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1, "INFO": 0}
+    aggregated: Dict[str, Dict] = {}
+
+    # Aggregate directly from latest device vulnerability snapshots.
+    device_rows = db.query(models.DeviceLog).order_by(models.DeviceLog.id.desc()).limit(1000).all()
+    for row in device_rows:
+        for vuln in (row.vulnerabilities or []):
+            threat_id = (vuln.get("cve") or vuln.get("type") or "Unknown Threat").strip()
+            if not threat_id:
+                threat_id = "Unknown Threat"
+            severity = str(vuln.get("severity", "INFO")).upper()
+            description = vuln.get("description") or ""
+            key = threat_id.upper()
+            entry = aggregated.setdefault(key, {
+                "id": threat_id,
+                "severity": severity,
+                "description": description,
+                "affected_endpoints": set(),
+            })
+            if severity_rank.get(severity, 0) > severity_rank.get(entry["severity"], 0):
+                entry["severity"] = severity
+            if not entry["description"] and description:
+                entry["description"] = description
+            if row.ip_address:
+                entry["affected_endpoints"].add(row.ip_address)
+
+    # Aggregate historical threat events.
+    event_rows = db.query(models.SecurityEvent).order_by(models.SecurityEvent.id.desc()).limit(2000).all()
+    for ev in event_rows:
+        if ev.event_type not in {"VULN_DETECTED", "THREAT", "ALERT"}:
+            continue
+        desc = ev.description or ""
+        threat_id = "Unknown Threat"
+        if desc.startswith("[") and "]" in desc:
+            threat_id = desc[1:desc.index("]")].strip() or threat_id
+        elif ":" in desc:
+            threat_id = desc.split(":", 1)[0].strip() or threat_id
+        severity = str(ev.severity or "INFO").upper()
+        key = threat_id.upper()
+        entry = aggregated.setdefault(key, {
+            "id": threat_id,
+            "severity": severity,
+            "description": desc,
+            "affected_endpoints": set(),
+        })
+        if severity_rank.get(severity, 0) > severity_rank.get(entry["severity"], 0):
+            entry["severity"] = severity
+        if not entry["description"] and desc:
+            entry["description"] = desc
+        if ev.ip_address:
+            entry["affected_endpoints"].add(ev.ip_address)
+
+    threats = [{
+        "id": v["id"],
+        "severity": v["severity"],
+        "description": v["description"] or "No description available.",
+        "affected_endpoints": len(v["affected_endpoints"]),
+        "score": severity_rank.get(v["severity"], 0),
+    } for v in aggregated.values()]
+    threats.sort(key=lambda t: (t["score"], t["affected_endpoints"]), reverse=True)
+    return threats[:10]
+
+
+@app.get("/policies")
+def get_policies():
+    return _load_policies()
+
+
+@app.post("/policies/{policy_name}")
+def set_policy(policy_name: str, request: PolicyToggleRequest):
+    policies = _load_policies()
+    if policy_name not in policies:
+        raise HTTPException(status_code=404, detail="Unknown policy")
+    policies[policy_name] = bool(request.value)
+    _save_policies(policies)
+    return {"status": "ok", "policy": policy_name, "value": policies[policy_name], "policies": policies}
 
 def _build_stats(db: Session) -> dict:
     latest_session = db.query(models.ScanSession).order_by(models.ScanSession.id.desc()).first()
@@ -224,10 +356,16 @@ Return format (JSON array only, no markdown):
             )
             if resp.status_code != 200:
                 return {"error": f"Ollama returned {resp.status_code}", "findings": []}
+            
             raw = resp.json().get("response", "[]").strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"): raw = raw[4:]
+            
+            # CRITICAL FIX: Generate backticks dynamically to prevent copy-paste terminal breaks
+            md_marker = "`" * 3
+            if raw.startswith(md_marker):
+                raw = raw.split(md_marker)[1]
+                if raw.startswith("json"): 
+                    raw = raw[4:]
+            
             findings = json.loads(raw)
             return {"findings": findings if isinstance(findings, list) else [], "model": OLLAMA_MODEL}
     except Exception:
@@ -244,8 +382,6 @@ async def ollama_status():
         pass
     return {"online": False, "note": "Ollama service not detected", "url": OLLAMA_URL}
 
-# ── Agent control endpoints ──
-
 @app.get("/agent/status")
 def agent_status():
     if _sin_agent is None:
@@ -254,7 +390,6 @@ def agent_status():
 
 @app.post("/agent/isolate/{ip}")
 def isolate_device(ip: str, db: Session = Depends(get_db)):
-    """Manually trigger Active ARP Quarantine for a device."""
     if _sin_agent is None:
         raise HTTPException(503, "Agent not running")
 
@@ -288,16 +423,24 @@ def list_mitigations():
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
     await websocket.accept()
-    if _sin_agent is None:
-        await websocket.send_json({"kind": "error", "msg": "Agent not running"})
-        await websocket.close()
-        return
-    q = _sin_agent.subscribe()
+    
+    r = aioredis.Redis(
+        host=os.getenv("SIN_REDIS_HOST", "redis"),
+        port=int(os.getenv("SIN_REDIS_PORT", "6379")),
+        password=os.getenv("SIN_REDIS_PASSWORD", ""),
+        decode_responses=True
+    )
+    pubsub = r.pubsub()
+    await pubsub.subscribe("sin:ws:stream")
+    
     try:
         while True:
-            data = await asyncio.wait_for(q.get(), timeout=30)
-            await websocket.send_json(data)
-    except (WebSocketDisconnect, asyncio.TimeoutError):
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if message:
+                await websocket.send_json(json.loads(message["data"]))
+            await asyncio.sleep(0.2)
+    except (WebSocketDisconnect, asyncio.CancelledError):
         pass
     finally:
-        _sin_agent.unsubscribe(q)
+        await pubsub.unsubscribe("sin:ws:stream")
+        await r.close()

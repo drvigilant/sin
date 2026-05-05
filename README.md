@@ -1,17 +1,13 @@
-<div align="center">
-
 # ◈ SIN // SHADOWS IN THE NETWORK
 
 ### Enterprise SOC • EDR • Autonomous Threat Hunting Platform
 
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Go](https://img.shields.io/badge/Go-1.21-00ADD8?style=for-the-badge&logo=go&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+Python
+Go
+Docker
+FastAPI
 
 **SIN** is a high-performance Tier-1 SOC platform designed for **autonomous asset discovery, threat detection, and real-time mitigation** across enterprise and IoT/OT environments.
-
-</div>
 
 ---
 
@@ -26,29 +22,34 @@ It continuously maps assets, correlates vulnerabilities with real-world exploit 
 ## ✨ Core Features
 
 ### 🎯 Autonomous Asset Discovery
+
 - High-speed subnet scanning using distributed sensors  
 - Deep fingerprinting (MAC/OUI, vendor, firmware, serials)  
-- ONVIF / ISAPI probing for IoT & surveillance devices  
+- ONVIF / ISAPI probing for IoT & surveillance devices
 
 ### 🛡️ Dynamic Risk Engine
+
 - CVE correlation with **CISA KEV catalog**  
 - EPSS-based exploit probability scoring  
-- Heuristic + deterministic risk modeling  
+- Heuristic + deterministic risk modeling
 
 ### ⚔️ Automated Mitigation
+
 - Real-time **ARP-based quarantine** of compromised assets  
 - Policy-driven response thresholds  
-- Zero manual intervention required  
+- Zero manual intervention required
 
 ### 🧠 AI Analyst Integration
+
 - Built-in AI console for threat interpretation  
 - Generates **context-aware remediation playbooks**  
-- Compatible with Ollama / Claude  
+- Compatible with Ollama / Claude
 
 ### 📊 SOC Dashboard
+
 - Dark-mode, glass-cockpit interface  
 - Real-time telemetry + forensic visibility  
-- Inspired by modern EDR platforms  
+- Inspired by modern EDR platforms
 
 ---
 
@@ -56,57 +57,72 @@ It continuously maps assets, correlates vulnerabilities with real-world exploit 
 
 SIN follows a **decoupled, asynchronous microservices design**:
 
-| Component        | Technology Stack                  |
-|----------------|----------------------------------|
-| Frontend UI     | HTML, Grid CSS, Vanilla JS       |
-| Backend API     | FastAPI (REST + WebSockets)      |
-| Task Engine     | Celery + Redis                   |
-| Database        | PostgreSQL / SQLite              |
-| Sensors         | Python + Go (Scapy, PCAP)        |
-| Deployment      | Docker + Docker Compose          |
+
+| Component   | Technology Stack            |
+| ----------- | --------------------------- |
+| Frontend UI | HTML, Grid CSS, Vanilla JS  |
+| Backend API | FastAPI (REST + WebSockets) |
+| Task Engine | Celery + Redis              |
+| Database    | PostgreSQL / SQLite         |
+| Sensors     | Python + Go (Scapy, PCAP)   |
+| Deployment  | Docker + Docker Compose     |
+
 
 ---
 
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
+
 ```bash
 git clone https://github.com/drvigilant/sin.git
 cd sin
 ```
 
 ---
+
 ### 2. Configure Environment
+
 ```bash
 cp .env.example .env
 ```
+
 #### Edit .env and add required secrets.
+
 ---
+
 ### 3. Deploy Stack
+
 ```bash
 docker compose up -d --build
 ```
+
 #### This will start: Nginx frontend, FastAPI backend, Celery workers, Redis + Database
+
 ---
+
 ### 4. Access Dashboard
+
 ```bash
 http://localhost
 ```
 
-⚙️ Configuration
----
+## ⚙️ Configuration
+
 ### Key environment variables:
 
 - Variable	Description	Default
 - SIN_API_KEY	API authentication key	Required
 - SIN_CONFIDENCE_THRESHOLD	Risk score threshold (0–1) for auto-quarantine	0.80
 - SIN_REDIS_HOST	Redis host for task queue	redis
-- OLLAMA_URL	AI analyst endpoint	http://ollama:11434
+- OLLAMA_URL	AI analyst endpoint	[http://ollama:11434](http://ollama:11434)
+
 ---
 
 ### 💻 API Usage
 
 SIN is API-first — everything in the UI can be triggered programmatically.
+
 ```bash
 Trigger Network Scan
 curl -X POST http://localhost:8000/scan/trigger \
@@ -116,10 +132,13 @@ curl -X POST http://localhost:8000/scan/trigger \
 ```
 
 ---
+
 ### Check Agent Status
 
+```bash
 curl http://localhost:8000/agent/status \
-  -H "X-API-Key: your_api_key"
+	-H "X-API-Key: your_api_key"
+```
 
 ---
 
@@ -179,7 +198,3 @@ Pull requests, issues, and security discussions are welcome.
 ### 📜 License
 
 MIT License (or specify your license)
-
-<div align="center">
-
-
