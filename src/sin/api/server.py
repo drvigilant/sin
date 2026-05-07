@@ -111,6 +111,17 @@ def get_db():
         yield db
     finally:
         db.close()
+# In server.py
+@app.delete("/devices/purge-non-iot")
+def purge_non_iot_devices(db: Session = Depends(get_db)):
+    """Remove device_logs for IPs whose hostname matches non-IoT patterns."""
+    deleted = db.query(models.DeviceLog).filter(
+        models.DeviceLog.hostname.ilike("desktop-%") |
+        models.DeviceLog.hostname.ilike("laptop-%") |
+        models.DeviceLog.hostname == "Unknown"
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
 
 class ScanRequest(BaseModel):
     subnet: Optional[str] = None
@@ -169,6 +180,20 @@ def run_scan_job(subnet: str):
 @app.get("/health")
 def health_check():
     return {"status": "online", "api": "SIN Enterprise"}
+
+@app.post("/ingest")
+async def ingest(request: Request):
+    data = await request.json()
+
+    # minimal normalization
+    event = {
+        "source": "agent",
+        "data": data
+    }
+
+    logger.info(f"[INGEST] {event}")
+
+    return {"status": "ok"}
 
 @app.post("/scan/trigger")
 def trigger_network_scan(request: ScanRequest, background_tasks: BackgroundTasks):

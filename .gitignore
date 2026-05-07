@@ -58,3 +58,7 @@ logs/
 # ── Distribution whitelisting ─────────────────────────────────────
 dist/*
 !src/sin/ui/dist/index.html
+.aider*
+.env
+.env
+.env

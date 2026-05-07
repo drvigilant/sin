@@ -43,6 +43,14 @@ _MANAGED_OS = {"windows", "ubuntu", "debian", "centos", "fedora", "macos", "prox
 _NON_IOT_HOSTNAME_TOKENS = {
     "desktop-", "laptop-", "workstation", "thinkpad", "macbook", "surface", "pc-", "win-"
 }
+_WINDOWS_PC_MAC_OUIS = {
+    "d4:5d:64",  # Dell
+    "b8:ca:3a",  # Dell
+    "f0:1f:af",  # HP
+    "3c:d9:2b",  # HP
+    "00:50:56",  # VMware (dev machines)
+    "00:0c:29",  # VMware
+}
 _CAMERA_BANNER_TOKENS = {
     "rtsp", "onvif", "h264dvr", "ip camera", "network camera", "camera login",
     "hikvision", "dahua", "xiongmai", "axis", "vivotek", "reolink", "amcrest", "uniview",
@@ -122,6 +130,8 @@ def _is_iot(asset: Dict, whitelisted_macs: set) -> bool:
         return False
     if device_type in {"desktop", "laptop", "workstation", "server"}:
         return False
+    if _normalise_mac_prefix(mac) in _WINDOWS_PC_MAC_OUIS:
+    	return False
 
     # 3. HARD INCLUSION SIGNALS (must be explicit, not inferred)
     has_strict_iot_port = bool(_STRICT_IOT_PORTS.intersection(ports))
