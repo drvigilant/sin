@@ -65,23 +65,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    network_mode: host
     environment:
       - SIN_DB_HOST=db
-      - SIN_DB_USER=${POSTGRES_USER}
-      - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
-      - SIN_DB_NAME=${POSTGRES_DB}
-      - SIN_REDIS_HOST=redis
-      - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - SIN_SCAN_SUBNET=${SIN_SCAN_SUBNET}
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
-    restart: unless-stopped
-    networks:
-      - sin_internal
-      - sin_scan
 
   beat:
     build: .
