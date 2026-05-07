@@ -50,6 +50,7 @@ services:
       - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SIN_API_KEY=${SIN_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - GROQ_API_KEY=${GROQ_API_KEY}
     restart: unless-stopped
     networks:
       - sin_internal

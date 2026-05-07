@@ -128,7 +128,7 @@ class ScanRequest(BaseModel):
 
 class OllamaAuditRequest(BaseModel):
     ip_address: str
-    open_ports: list
+    open_ports: list = []
     vendor: str = ""
     os_family: str = ""
     hostname: str = ""
@@ -358,43 +358,108 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     return _build_stats(db)
 
 @app.post("/ai/audit")
-async def ollama_audit(request: OllamaAuditRequest):
-    prompt = f"""You are an expert IoT security analyst.
-Analyse this network device and identify vulnerabilities, misconfigurations, or security risks.
-Be concise and specific. Return ONLY a JSON array of findings, no other text.
+async def ai_audit(request: OllamaAuditRequest):
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    if not GROQ_API_KEY:
+        return {"error": "GROQ_API_KEY not configured.", "findings": []}
 
-Device:
-- IP: {request.ip_address}
-- Open Ports: {request.open_ports}
-- Vendor: {request.vendor or 'Unknown'}
-- OS: {request.os_family or 'Unknown'}
-- Existing Findings: {json.dumps(request.vulnerabilities)}
+    # Pull full device context from DB
+    db = SessionLocal()
+    try:
+        device = db.query(models.DeviceLog).filter(
+            models.DeviceLog.ip_address == request.ip_address
+        ).order_by(models.DeviceLog.id.desc()).first()
+        firmware   = getattr(device, 'firmware', 'Unknown') or 'Unknown'
+        model_name = getattr(device, 'model', 'Unknown') or 'Unknown'
+        serial     = getattr(device, 'serial_number', 'N/A') or 'N/A'
+        mac        = getattr(device, 'mac_address', 'Unknown') or 'Unknown'
+        vendor     = getattr(device, 'vendor', 'Unknown') or 'Unknown'
+        device_type = getattr(device, 'device_type', 'Unknown') or 'Unknown'
+        open_ports = getattr(device, 'open_ports', []) or request.open_ports
+        vulns      = getattr(device, 'vulnerabilities', []) or []
+    except Exception:
+        firmware = model_name = serial = mac = vendor = device_type = 'Unknown'
+        open_ports = request.open_ports
+        vulns = request.vulnerabilities
+    finally:
+        db.close()
 
-Return format (JSON array only, no markdown):
-[{{"severity": "HIGH|MEDIUM|LOW", "type": "category", "description": "finding"}}]"""
+    prompt = f"""You are an expert IoT penetration tester and SOC analyst specialising in CCTV and embedded device security.
+
+Perform a full security assessment on this device and return a JSON array of findings.
+
+Device Context:
+- IP Address: {request.ip_address}
+- MAC Address: {mac}
+- Vendor: {vendor}
+- Model: {model_name}
+- Device Type: {device_type}
+- Firmware Version: {firmware}
+- Serial Number: {serial}
+- Open Ports: {open_ports}
+- OS Family: {request.os_family or 'Embedded Linux'}
+- Known Vulnerabilities Already Detected: {json.dumps(vulns)}
+
+Your tasks:
+1. Identify all security risks based on open ports, firmware version, and vendor
+2. Check if the firmware version appears outdated or vulnerable
+3. Identify default credential risks specific to this vendor and model
+4. Flag unencrypted protocol exposure (RTSP on 554, Telnet on 23, FTP on 21, HTTP on 80)
+5. Suggest specific CVEs relevant to this vendor/firmware
+6. Provide concrete remediation steps
+
+Return ONLY a JSON array. No markdown, no explanation, no text outside the array:
+[
+  {{
+    "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+    "type": "category name",
+    "cve": "CVE-XXXX-XXXXX or empty string",
+    "description": "specific technical finding",
+    "remediation": ["step 1", "step 2"]
+  }}
+]"""
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                f"{OLLAMA_URL}/api/generate",
-                json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"}
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "max_tokens": 1500,
+                }
             )
             if resp.status_code != 200:
-                return {"error": f"Ollama returned {resp.status_code}", "findings": []}
-            
-            raw = resp.json().get("response", "[]").strip()
-            
-            # CRITICAL FIX: Generate backticks dynamically to prevent copy-paste terminal breaks
-            md_marker = "`" * 3
-            if raw.startswith(md_marker):
-                raw = raw.split(md_marker)[1]
-                if raw.startswith("json"): 
+                logger.error(f"Groq error: {resp.status_code} {resp.text}")
+                return {"error": f"Groq returned {resp.status_code}", "findings": []}
+
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+            # Strip markdown fences if present
+            md = "`" * 3
+            if raw.startswith(md):
+                raw = raw.split(md)[1]
+                if raw.startswith("json"):
                     raw = raw[4:]
-            
+            raw = raw.strip()
+
             findings = json.loads(raw)
-            return {"findings": findings if isinstance(findings, list) else [], "model": OLLAMA_MODEL}
-    except Exception:
-        return {"error": "Ollama not reachable. Setup Ollama to enable AI insights.", "findings": [], "model": OLLAMA_MODEL}
+            return {
+                "findings": findings if isinstance(findings, list) else [],
+                "model": "llama-3.1-8b-instant",
+                "device": {"ip": request.ip_address, "vendor": vendor, "firmware": firmware}
+            }
+    except json.JSONDecodeError as ex:
+        logger.error(f"Groq JSON parse error: {ex} | raw: {raw[:200]}")
+        return {"error": "AI returned malformed JSON.", "findings": [], "model": "groq"}
+    except Exception as ex:
+        logger.error(f"Groq audit failed: {ex}")
+        return {"error": str(ex), "findings": [], "model": "groq"}
 
 @app.get("/ai/status")
 async def ollama_status():
