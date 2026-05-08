@@ -27,6 +27,10 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
 )
 
+# ── ADDITION 1: tell redbeat which Redis to use ──────────────────────────────
+celery_app.conf.redbeat_redis_url = BROKER_URL
+# ─────────────────────────────────────────────────────────────────────────────
+
 celery_app.conf.beat_schedule = {
     "scan-network-every-5-minutes": {
         "task": "run_network_scan",
@@ -35,6 +39,14 @@ celery_app.conf.beat_schedule = {
     },
 }
 
+# ── ADDITION 2: use Redis-backed scheduler instead of the pickle file ─────────
+celery_app.conf.beat_scheduler = "redbeat.RedBeatScheduler"
+# ─────────────────────────────────────────────────────────────────────────────
+
 celery_app.conf.task_acks_late = True
 celery_app.conf.worker_prefetch_multiplier = 1
 celery_app.conf.beat_max_loop_interval = 300
+
+# ── ADDITION 3: lock interval so redbeat and beat_max_loop_interval agree ────
+celery_app.conf.redbeat_lock_timeout = 450   # 1.5× beat_max_loop_interval
+# ─────────────────────────────────────────────────────────────────────────────

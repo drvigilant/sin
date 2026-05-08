@@ -24,7 +24,7 @@ def _get_redis():
         return None
 
 
-@shared_task(name="run_network_scan")
+@shared_task(name="run_network_scan", queue="scan", acks_late=True, max_retries=3)
 def run_network_scan(subnet="192.168.30"):
     r = _get_redis()
     if r:

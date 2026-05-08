@@ -19,16 +19,34 @@ services:
     networks:
       - sin_internal
       - sin_scan
+    deploy:
+     resources:
+       limits:
+         cpus: "1.0"
+         memory: 512M
 
   redis:
     image: redis:7-alpine
     container_name: sin_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --save 60 1000
+    volumes:
+      - redis_data:/data
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - sin_internal
+      - sin_scan
 
   api:
     build: .
@@ -36,8 +54,6 @@ services:
     command: >
       sh -c "python -c 'from sin.storage.init_db import init_db; init_db()' &&
              uvicorn sin.api.server:app --host 0.0.0.0 --port 8000"
-    volumes:
-      - .:/app
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -60,18 +76,24 @@ services:
     restart: unless-stopped
     networks:
       - sin_internal
+      - sin_scan
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 128M
 
   worker:
     build: .
     container_name: sin_worker
-    command: celery -A sin.tasks.celery_app worker --loglevel=info --concurrency=4
-    volumes:
-      - .:/app
+    command: celery -A sin.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=scan,celery
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     network_mode: host
     environment:
       - SIN_DB_HOST=localhost
@@ -90,31 +112,36 @@ services:
     cap_add:
       - NET_RAW
       - NET_ADMIN
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          memory: 256M
     restart: unless-stopped
 
   beat:
     build: .
     container_name: sin_beat
-    command: celery -A sin.tasks.celery_app beat --loglevel=info
-    volumes:
-      - .:/app
+    command: >
+      celery -A sin.tasks.celery_app beat
+      -S redbeat.RedBeatScheduler
+      --loglevel=info
     depends_on:
-      - db
       - redis
     environment:
-      - SIN_DB_HOST=db
-      - SIN_DB_PORT=5432
-      - SIN_DB_USER=${POSTGRES_USER}
-      - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
-      - SIN_DB_NAME=${POSTGRES_DB}
-      - SIN_REDIS_HOST=redis
-      - SIN_REDIS_PORT=6379
-      - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
-      - SIN_SCAN_SUBNET=${SIN_SCAN_SUBNET}
+      SIN_DB_HOST: db
+      SIN_DB_USER: ${POSTGRES_USER}
+      SIN_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SIN_DB_NAME: ${POSTGRES_DB}
+      SIN_REDIS_HOST: redis
+      SIN_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SIN_SCAN_SUBNET: ${SIN_SCAN_SUBNET}
     restart: unless-stopped
     networks:
       - sin_internal
-
+  
   dashboard:
     image: nginx:alpine
     container_name: sin_dashboard
@@ -129,13 +156,13 @@ services:
     networks:
       - sin_internal
       - sin_scan
-
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   sin_internal:
     driver: bridge
-    internal: false
+    internal: true
   sin_scan:
     driver: bridge
