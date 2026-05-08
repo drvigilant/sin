@@ -595,6 +595,9 @@
     '#d97757','#3fb950','#e3b341','#f0883e','#a5d6ff'
   ];
 
+  var flowBuffer = [];
+  var anomalyBuffer = [];
+
   function switchPage(pageId, tabEl) {
     document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
     if (tabEl) tabEl.classList.add('active');
@@ -602,8 +605,14 @@
     var pg = document.getElementById('page-' + pageId);
     if (pg) pg.classList.add('active');
     if (pageId === 'analytics') renderAnalytics();
+    if (pageId === 'network') {
+        // Flush buffered events into the Network Analyzer
+        flowBuffer.forEach(function(msg) { renderFlowRow(msg); });
+        anomalyBuffer.forEach(function(txt) { renderAnomalyRow(txt); });
+        flowBuffer = [];
+        anomalyBuffer = [];
+    }
   }
-
   setInterval(function() {
     uptimeSecs++;
     var h = String(Math.floor(uptimeSecs / 3600)).padStart(2,'0');
@@ -1129,13 +1138,25 @@
       } else if (data.type === "MITIGATION" || data.type === "DRIFT") {
         fetchAll();
       } else if (data.type === "FLOW_NEW") {
-        var msg = data.message || {};
-        renderFlowRow(msg);
-        if (msg.anomaly) renderAnomalyRow(msg.anomaly);
+   	 var msg = typeof data.message === 'string' ? JSON.parse(data.message) : data.message || {};
+ 	 var networkPage = document.getElementById('page-network');
+    	 if (networkPage && networkPage.classList.contains('active')) {
+       	     renderFlowRow(msg);
+   	 } else {
+      	     flowBuffer.push(msg);
+             if (flowBuffer.length > 100) flowBuffer.shift();
+      	 }
       } else if (data.type === "TRAFFIC_ALERT") {
-        var alertMsg = data.message || {};
-        if (alertMsg.anomaly) renderAnomalyRow(alertMsg.anomaly); else renderAnomalyRow(alertMsg);
-      }
+	    var alertMsg = typeof data.message === 'string' ? JSON.parse(data.message) : data.message || {};
+	    var anomalyText = alertMsg.anomaly || JSON.stringify(alertMsg);
+	    var networkPage = document.getElementById('page-network');
+	    if (networkPage && networkPage.classList.contains('active')) {
+       		 renderAnomalyRow(anomalyText);
+	    } else {
+        	anomalyBuffer.push(anomalyText);
+     	 	    if (anomalyBuffer.length > 100) anomalyBuffer.shift();
+    	    }
+      }     
     };
     ws.onclose = function() { setTimeout(initWebSocket, 5000); };
   }
