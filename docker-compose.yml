@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -22,6 +24,8 @@ services:
     image: redis:7-alpine
     container_name: sin_redis
     command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6380:6379"
     restart: unless-stopped
     networks:
       - sin_internal
@@ -43,10 +47,12 @@ services:
         condition: service_started
     environment:
       - SIN_DB_HOST=db
+      - SIN_DB_PORT=5432
       - SIN_DB_USER=${POSTGRES_USER}
       - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
       - SIN_DB_NAME=${POSTGRES_DB}
       - SIN_REDIS_HOST=redis
+      - SIN_REDIS_PORT=6379
       - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SIN_API_KEY=${SIN_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
@@ -68,7 +74,23 @@ services:
         condition: service_started
     network_mode: host
     environment:
-      - SIN_DB_HOST=db
+      - SIN_DB_HOST=localhost
+      - SIN_DB_PORT=5433
+      - SIN_DB_USER=${POSTGRES_USER}
+      - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - SIN_DB_NAME=${POSTGRES_DB}
+      - SIN_REDIS_HOST=localhost
+      - SIN_REDIS_PORT=6380
+      - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SIN_API_KEY=${SIN_API_KEY}
+      - SIN_SCAN_SUBNET=${SIN_SCAN_SUBNET}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    restart: unless-stopped
 
   beat:
     build: .
@@ -81,10 +103,12 @@ services:
       - redis
     environment:
       - SIN_DB_HOST=db
+      - SIN_DB_PORT=5432
       - SIN_DB_USER=${POSTGRES_USER}
       - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
       - SIN_DB_NAME=${POSTGRES_DB}
       - SIN_REDIS_HOST=redis
+      - SIN_REDIS_PORT=6379
       - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SIN_SCAN_SUBNET=${SIN_SCAN_SUBNET}
     restart: unless-stopped

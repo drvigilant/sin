@@ -242,13 +242,14 @@ def get_devices(db: Session = Depends(get_db)):
             "risk_level": d.risk_level,
             "scan_id": d.scan_id,
             "telemetry": getattr(d, 'telemetry', None) or {},
+	    "device_type": d.device_type or "unknown",
         })
     return devices
 
 @app.get("/events")
 def get_events(db: Session = Depends(get_db)):
     rows = db.query(models.SecurityEvent).order_by(models.SecurityEvent.timestamp.desc()).limit(200).all()
-    return [{"ip_address": e.ip_address, "event_type": e.event_type, "severity": e.severity, "description": e.description, "timestamp": e.timestamp.isoformat() if e.timestamp else ""} for e in rows]
+    return [{"ip_address": e.ip_address, "event_type": e.event_type, "severity": e.severity, "description": e.description, "timestamp": e.timestamp.isoformat() + "Z" if e.timestamp else ""} for e in rows]
 
 
 @app.get("/threats")

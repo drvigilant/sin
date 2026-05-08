@@ -1029,7 +1029,15 @@
     }).join('');
   }
 
-  function fmtTs(ts) { try { return new Date(ts).toLocaleTimeString('en-US', {hour12: false}); } catch(err) { return String(ts); } }
+  function fmtTs(ts) { 
+  try { 
+    return new Date(ts).toLocaleTimeString('en-IN', {
+      hour12: false, 
+      timeZone: 'Asia/Kolkata'
+    }); 
+   } catch(err) { return String(ts); } 
+  }
+  
   function e(str) { return str == null ? '' : String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function sid(ip) { return String(ip).replace(/[^a-zA-Z0-9]/g,'_'); }
 

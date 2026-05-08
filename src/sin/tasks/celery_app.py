@@ -2,13 +2,14 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-REDIS_HOST = os.getenv("SIN_REDIS_HOST", "localhost")
+REDIS_HOST     = os.getenv("SIN_REDIS_HOST", "localhost")
+REDIS_PORT     = os.getenv("SIN_REDIS_PORT", "6379")
 REDIS_PASSWORD = os.getenv("SIN_REDIS_PASSWORD", "")
 
 if REDIS_PASSWORD:
-    BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+    BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
 else:
-    BROKER_URL = f"redis://{REDIS_HOST}:6379/0"
+    BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 celery_app = Celery(
     "sin_tasks",
@@ -34,7 +35,6 @@ celery_app.conf.beat_schedule = {
     },
 }
 
-# Prevent duplicate scans — only one scan task at a time
 celery_app.conf.task_acks_late = True
 celery_app.conf.worker_prefetch_multiplier = 1
 celery_app.conf.beat_max_loop_interval = 300
