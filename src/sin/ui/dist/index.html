@@ -1,1143 +1,1003 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIN — SHADOWS IN THE NETWORK</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIN — Shadows in the Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#06090e;--panel:#0d1117;--hover:#161b22;--border:#30363d;
+  --text:#e6edf3;--dim:#8b949e;--detail-bg:#090c10;
+  --red:#f85149;--red-bg:rgba(248,81,73,0.1);--red-border:rgba(248,81,73,0.4);
+  --orange:#d29922;--orange-bg:rgba(210,153,34,0.1);--orange-border:rgba(210,153,34,0.4);
+  --green:#2ea043;--green-bg:rgba(46,160,67,0.1);--green-border:rgba(46,160,67,0.4);
+  --blue:#58a6ff;--blue-bg:rgba(88,166,255,0.1);--purple:#8957e5;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Roboto Mono',monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:12px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);}
 
-    :root {
-      --bg:        #06090e;
-      --panel:     #0d1117;
-      --detail-bg: #090c10;
-      --hover:     #161b22;
-      --border:    #30363d;
-      --text:      #e6edf3;
-      --dim:       #8b949e;
+/* KEY OVERLAY */
+#key-overlay{position:fixed;inset:0;background:rgba(6,9,14,0.97);z-index:9999;display:flex;align-items:center;justify-content:center;}
+#key-overlay.hidden{display:none;}
+.key-box{border:1px solid var(--border);padding:32px 40px;background:var(--panel);width:420px;}
+.key-box-title{font-size:11px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:var(--red);margin-bottom:6px;}
+.key-box-sub{font-size:10px;color:var(--dim);margin-bottom:20px;line-height:1.6;}
+.key-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Roboto Mono',monospace;font-size:12px;padding:8px 12px;outline:none;margin-bottom:12px;}
+.key-input:focus{border-color:var(--blue);}
+.key-btn{width:100%;background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);font-family:'Roboto Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;padding:9px;cursor:pointer;}
+.key-btn:hover{background:rgba(248,81,73,0.2);}
+.key-err{font-size:9px;color:var(--red);margin-top:8px;min-height:14px;}
 
-      --red:       #f85149;
-      --red-bg:    rgba(248, 81, 73, 0.1);
-      --red-border:rgba(248, 81, 73, 0.4);
-      --orange:    #d29922;
-      --orange-bg: rgba(210, 153, 34, 0.1);
-      --orange-border: rgba(210, 153, 34, 0.4);
-      --green:     #2ea043;
-      --green-bg:  rgba(46, 160, 67, 0.1);
-      --blue:      #58a6ff;
-      --claude:    #d97757;
-      --purple:    #8957e5;
+/* INSPECT MODAL */
+#inspect-modal{position:fixed;inset:0;background:rgba(6,9,14,0.92);z-index:8888;display:flex;align-items:center;justify-content:center;}
+#inspect-modal.hidden{display:none;}
+.inspect-box{border:1px solid var(--border);background:var(--panel);width:760px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}
+.inspect-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.inspect-title{font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--blue);}
+.inspect-close{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Roboto Mono',monospace;font-size:9px;padding:3px 10px;cursor:pointer;}
+.inspect-close:hover{color:var(--text);}
+.inspect-body{flex:1;overflow-y:auto;padding:16px;}
+.inspect-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px;}
+.inspect-field label{font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:3px;}
+.inspect-field value{font-size:11px;color:var(--text);display:block;}
+.inspect-section-title{font-size:9px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.inspect-vulns{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.inspect-vuln{border:1px solid var(--border);padding:8px 10px;}
+.inspect-vuln.CRITICAL{border-left:2px solid var(--red);}
+.inspect-vuln.HIGH{border-left:2px solid var(--orange);}
+.inspect-vuln.MEDIUM{border-left:2px solid var(--blue);}
+.inspect-vuln.LOW{border-left:2px solid var(--green);}
+.vuln-head{display:flex;gap:7px;align-items:center;margin-bottom:4px;}
+.vuln-cve{font-size:10px;font-weight:600;color:var(--text);}
+.vuln-desc{font-size:10px;color:var(--dim);line-height:1.5;}
+.ai-audit-btn{background:var(--blue-bg);border:1px solid rgba(88,166,255,0.4);color:var(--blue);font-family:'Roboto Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding:7px 16px;cursor:pointer;margin-bottom:11px;display:block;}
+.ai-audit-btn:hover{background:rgba(88,166,255,0.18);}
+.ai-audit-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.ai-findings{display:flex;flex-direction:column;gap:6px;}
 
-      --row-grid:  150px 120px 200px 1.2fr 1.2fr 110px 110px;
-    }
+/* TOPBAR */
+.topbar{height:44px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:7px;margin-right:20px;flex-shrink:0;}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;box-shadow:0 0 12px var(--red);}}
+.logo-text{font-size:14px;font-weight:700;letter-spacing:0.25em;}
+.nav-tabs{display:flex;align-items:stretch;height:100%;margin-right:auto;}
+.nav-tab{display:flex;align-items:center;padding:0 13px;font-size:10px;font-weight:500;letter-spacing:0.10em;text-transform:uppercase;color:var(--dim);border-right:1px solid var(--border);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none;}
+.nav-tab:first-child{border-left:1px solid var(--border);}
+.nav-tab:hover{color:var(--text);background:var(--hover);}
+.nav-tab.active{color:var(--blue);border-bottom:2px solid var(--blue);background:var(--hover);}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.subnet-label{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--dim);}
+.subnet-input{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Roboto Mono',monospace;font-size:11px;padding:5px 10px;width:150px;outline:none;}
+.subnet-input:focus{border-color:var(--blue);}
+.scan-btn{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);font-family:'Roboto Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding:6px 16px;cursor:pointer;transition:background 0.15s;}
+.scan-btn:hover{background:rgba(248,81,73,0.2);}
+.scan-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.topbar-clock{font-size:11px;color:var(--dim);padding:0 12px;border-left:1px solid var(--border);}
 
-    body {
-      background: var(--bg); color: var(--text); font-family: 'Roboto', sans-serif;
-      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
+/* STAT ROW */
+.stat-row{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;height:76px;}
+.stat-card{flex:1;background:var(--panel);border-right:1px solid var(--border);padding:10px 14px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;transition:background 0.15s;}
+.stat-card:hover{background:var(--hover);}
+.stat-card:last-child{border-right:none;flex:1.4;}
+.stat-label{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--dim);font-weight:500;}
+.stat-value{font-size:22px;font-weight:700;line-height:1;}
+.stat-value.red{color:var(--red);}
+.stat-value.green{color:var(--green);}
+.stat-value.blue{color:var(--blue);}
+.stat-value.orange{color:var(--orange);}
+.stat-sub{font-size:9px;color:var(--dim);}
+.activity-line{font-size:9.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.activity-line .ts{color:var(--blue);margin-right:6px;}
+.activity-line .ok{color:var(--green);}
+.activity-line .warn{color:var(--orange);}
+.activity-line .crit{color:var(--red);}
+.stat-indicator{position:absolute;left:0;top:0;bottom:0;width:2px;}
+.ind-red{background:var(--red);}
+.ind-green{background:var(--green);}
+.ind-blue{background:var(--blue);}
+.ind-orange{background:var(--orange);}
+.ind-dim{background:var(--border);}
 
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
+/* MAIN */
+.main-area{display:flex;flex:1;overflow:hidden;min-height:0;}
+.tab-panel{display:none;flex:1;overflow:hidden;min-height:0;flex-direction:column;}
+.tab-panel.active{display:flex;}
 
-    /* ── TOPBAR ── */
-    .topbar {
-      height: 56px; background: var(--panel); border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; z-index: 100;
-    }
-    .topbar-left { display: flex; align-items: center; gap: 14px; height: 100%; }
-    .topbar-right { display: flex; align-items: center; gap: 12px; }
-    .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex-shrink: 0; box-shadow: 0 0 10px rgba(248,81,73,0.3); }
-    .logo-sin { font-size: 18px; font-weight: 700; letter-spacing: 0.05em; }
-    .vdivider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; margin: 0 8px; }
-    .nav-tabs { display: flex; gap: 24px; margin-left: 4px; height: 100%; align-items: center; }
-    .tab { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; transition: color 0.2s; height: 100%; display: flex; align-items: center; border-bottom: 2px solid transparent; }
-    .tab:hover { color: var(--text); }
-    .tab.active { color: var(--text); border-bottom: 2px solid var(--red); font-weight: 600; }
-    .subnet-input { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'Roboto Mono', monospace; font-size: 12px; padding: 6px 12px; width: 160px; outline: none; transition: border-color 0.2s; }
-    .subnet-input:focus { border-color: var(--blue); }
-    .scan-btn { background: transparent; border: 1px solid var(--red); border-radius: 4px; color: var(--red); font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 16px; cursor: pointer; transition: border-color 0.2s, color 0.2s; min-width: 140px; height: 32px; background-image: linear-gradient(to right, rgba(88,166,255,0.25) 0%, rgba(88,166,255,0.25) 100%); background-size: 0% 100%; background-repeat: no-repeat; }
-    .scan-btn:hover:not(:disabled) { background-color: var(--red-bg); }
-    .scan-btn:disabled { border-color: var(--blue); color: var(--blue); cursor: not-allowed; }
+/* SECTION HEADER */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;gap:8px;}
+.section-title{font-size:9px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--dim);}
+.section-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.section-badge{font-size:9px;color:var(--dim);border:1px solid var(--border);padding:2px 6px;}
 
-    /* ── STAT CARDS ── */
-    .stat-cards { height: 90px; display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr 2.5fr; border-bottom: 1px solid var(--border); background: var(--panel); }
-    .stat-card { border-right: 1px solid var(--border); padding: 0 24px; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
-    .stat-card:last-child { border-right: none; }
-    .stat-card.critical-pulse { animation: criticalPulse 1.6s ease-in-out infinite; }
-    .stat-label { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; white-space: nowrap; }
-    .stat-value { font-size: 32px; font-weight: 700; line-height: 1; font-family: 'Roboto Mono', monospace; }
-    .stat-sub { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stat-card-stream { justify-content: space-between; padding: 14px 24px; gap: 0; }
-    .stream-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .mini-events { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow: hidden; justify-content: flex-start; }
-    .mini-ev { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* DEVICE TABLE */
+.table-section{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
+.table-wrap{flex:1;overflow-y:auto;overflow-x:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--bg);position:sticky;top:0;z-index:10;}
+thead th{padding:7px 10px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);white-space:nowrap;}
+thead th:first-child{padding-left:14px;}
+thead th:last-child{padding-right:14px;}
+tbody tr{border-bottom:1px solid rgba(48,54,61,0.6);transition:background 0.12s;}
+tbody tr:hover{background:var(--hover);}
+tbody td{padding:8px 10px;vertical-align:middle;font-size:11px;white-space:nowrap;}
+tbody td:first-child{padding-left:14px;}
+tbody td:last-child{padding-right:14px;}
+.endpoint-ip{font-size:12px;font-weight:600;display:block;}
+.endpoint-name{font-size:9px;color:var(--dim);display:block;margin-top:1px;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+.mac-addr{font-size:10px;display:block;}
+.oui-vendor{font-size:9px;color:var(--blue);display:block;margin-top:1px;text-transform:uppercase;}
+.cve-badges{display:flex;flex-direction:column;gap:3px;}
+.cve-badge{display:inline-block;font-size:9px;font-weight:600;padding:2px 5px;border:1px solid;line-height:1.2;}
+.cve-badge.crit{color:var(--red);background:var(--red-bg);border-color:var(--red-border);}
+.cve-badge.high{color:var(--orange);background:var(--orange-bg);border-color:var(--orange-border);}
+.cve-badge.med{color:var(--blue);background:var(--blue-bg);border-color:rgba(88,166,255,0.35);}
+.no-vuln{font-size:9px;color:var(--green);}
+.port-pills{display:flex;gap:4px;flex-wrap:wrap;}
+.port-pill{font-size:9px;font-weight:500;color:var(--blue);background:var(--blue-bg);border:1px solid rgba(88,166,255,0.3);padding:2px 5px;}
+.risk-cell{width:110px;}
+.risk-score-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.risk-number{font-size:13px;font-weight:700;min-width:26px;text-align:right;}
+.risk-bar-track{flex:1;height:4px;background:rgba(48,54,61,0.8);overflow:hidden;}
+.risk-bar-fill{height:100%;transition:width 0.3s ease;}
+.risk-label{font-size:8px;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;}
+.state-badge{font-size:9px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:3px 7px;border:1px solid;display:inline-block;}
+.state-online{color:var(--green);background:var(--green-bg);border-color:var(--green-border);}
+.state-isolated{color:var(--orange);background:var(--orange-bg);border-color:var(--orange-border);}
+.controls-cell{display:flex;gap:6px;align-items:center;}
+.btn-quar{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);font-family:'Roboto Mono',monospace;font-size:8px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:4px 8px;cursor:pointer;}
+.btn-quar:hover{background:rgba(248,81,73,0.2);}
+.btn-quar.active{background:rgba(210,153,34,0.15);border-color:var(--orange-border);color:var(--orange);}
+.btn-insp{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Roboto Mono',monospace;font-size:8px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;padding:4px 8px;cursor:pointer;}
+.btn-insp:hover{background:var(--hover);color:var(--text);}
+.empty-state{padding:40px;text-align:center;color:var(--dim);font-size:10px;letter-spacing:0.1em;}
+.risk-crit{color:var(--red);}
+.risk-high,.risk-med{color:var(--orange);}
+.risk-low{color:var(--green);}
+.fill-crit{background:var(--red);}
+.fill-high,.fill-med{background:var(--orange);}
+.fill-low{background:var(--green);}
 
-    /* ── MAIN AREA ── */
-    .main-area { flex: 1; display: flex; overflow: hidden; min-height: 0; background: var(--bg); }
-    .page-content { flex: 1; display: none; flex-direction: column; overflow: hidden; }
-    .page-content.active { display: flex; }
+/* SIDEBAR */
+.sidebar{width:310px;flex-shrink:0;display:flex;flex-direction:column;background:var(--panel);overflow:hidden;}
+.event-stream{flex:1;overflow-y:auto;}
+.event-entry{padding:8px 14px;border-bottom:1px solid rgba(48,54,61,0.5);}
+.event-entry:hover{background:var(--hover);}
+.event-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.event-ts{font-size:9px;color:var(--blue);flex-shrink:0;}
+.event-type{font-size:8px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border:1px solid;flex-shrink:0;}
+.etype-crit{color:var(--red);background:var(--red-bg);border-color:var(--red-border);}
+.etype-warn{color:var(--orange);background:var(--orange-bg);border-color:var(--orange-border);}
+.etype-ok{color:var(--green);background:var(--green-bg);border-color:var(--green-border);}
+.etype-info{color:var(--blue);background:var(--blue-bg);border-color:rgba(88,166,255,0.35);}
+.event-src{font-size:9px;color:var(--dim);margin-left:auto;max-width:90px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.event-msg{font-size:10px;color:var(--text);line-height:1.4;}
+.sidebar-divider{padding:5px 14px;background:var(--bg);border-bottom:1px solid var(--border);}
+.divider-label{font-size:8px;letter-spacing:0.16em;text-transform:uppercase;color:var(--dim);}
 
-    /* ── EDR PAGE ── */
-    .edr-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
-    .col-headers { height: 48px; display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--panel); align-items: center; }
-    .col-header { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
-    .device-list { flex: 1; overflow-y: auto; overflow-x: hidden; }
-    .device-row { border-bottom: 1px solid var(--border); }
-    .device-row-main { display: grid; grid-template-columns: var(--row-grid); gap: 24px; padding: 16px 24px; cursor: pointer; align-items: start; transition: background 0.15s; }
-    .device-row-main:hover { background: var(--hover); }
-    .col-endpoint { display: flex; align-items: flex-start; gap: 8px; }
-    .chevron { color: var(--dim); font-size: 16px; line-height: 1.1; transition: transform 0.2s ease; width: 14px; flex-shrink: 0; }
-    .chevron.open { transform: rotate(90deg); }
-    .ip-addr { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2; }
-    .row-hostname { font-size: 11px; color: var(--dim); margin-top: 4px; font-family: 'Roboto Mono', monospace; }
-    .col-mac .mac { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 500; line-height: 1.2; }
-    .col-mac .oui { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 4px; text-transform: uppercase; }
-    .col-fp { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
-    .col-fp > div { min-width: 0; width: 100%; }
-    .fp-dot { font-size: 12px; line-height: 1; flex-shrink: 0; }
-    .fp-vendor { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2; }
-    .fp-os { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); margin-top: 4px; }
-    .hw-tag { color: var(--blue); font-size: 9px; margin-top: 6px; font-family: 'Roboto Mono', monospace; word-break: break-all; line-height: 1.4; }
-    .col-vulns { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: -2px; }
-    .alert-box { display: inline-flex; flex-direction: column; gap: 6px; padding: 6px 10px; border-radius: 4px; font-family: 'Roboto Mono', monospace; width: fit-content; min-width: 140px; }
-    .alert-box.crit { background: var(--red-bg); border: 1px solid var(--red-border); }
-    .alert-box.high { background: var(--orange-bg); border: 1px solid var(--orange-border); }
-    .alert-box.secure { background: var(--green-bg); border: 1px solid rgba(46,160,67,0.2); }
-    .cve-link { font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .cve-link:hover { text-decoration: underline; }
-    .sev-row { display: flex; align-items: center; gap: 6px; }
-    .sev-text { font-size: 9px; font-weight: 700; text-transform: uppercase; }
-    .col-network { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
-    .port-pill { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 6px; }
-    .col-risk { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-end; height: 16px; }
-    .risk-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-    .risk-fill { height: 100%; border-radius: 2px; width: 0; transition: width 0.8s; }
-    .risk-num { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
-    .col-mit { display: flex; align-items: flex-start; justify-content: flex-end; }
-    .quar-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 6px 12px; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center; margin-top: -3px; }
-    .quar-btn.active { background: var(--claude); border-color: var(--claude); color: #000; font-weight: 700; }
-    .quar-btn.active:hover { opacity: 0.85; }
-    .quar-btn.restore { border-color: var(--blue); color: var(--blue); }
-    .white-btn { background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 4px 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-    .white-btn:hover { border-color: var(--text); color: var(--text); background: rgba(255,255,255,0.05); }
-    .device-detail { display: grid; grid-template-columns: 300px 1.5fr 1fr; background: var(--detail-bg); max-height: 0; overflow: hidden; transition: max-height 0.3s; }
-    .device-detail.open { max-height: 400px; border-top: 1px solid var(--border); box-shadow: inset 0 4px 6px rgba(0,0,0,0.2); }
-    .detail-col { padding: 20px 24px; border-right: 1px solid var(--border); overflow-y: auto; }
-    .detail-hdr { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; font-weight: 600; }
-    .id-grid { display: grid; grid-template-columns: 80px 1fr; gap: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 10px; margin-bottom: 16px; }
-    .id-lbl { color: var(--dim); }
-    .id-val { color: var(--text); font-weight: 600; word-break: break-all; }
-    .finding-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-    .finding-item { font-size: 11px; color: var(--text); display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; font-family: 'Roboto Mono', monospace; background: var(--panel); padding: 10px; border: 1px solid var(--border); border-radius: 4px; }
-    .rem-list { margin-top: 8px; margin-left: 16px; list-style-type: square; color: var(--dim); }
-    .rem-list li { margin-bottom: 4px; }
-    .audit-run-btn { background: transparent; border: 1px solid var(--dim); border-radius: 4px; color: var(--dim); font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 4px 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-    .audit-run-btn:hover { border-color: var(--blue); color: var(--blue); }
-    .audit-out { width: 100%; height: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--green); font-family: 'Roboto Mono', monospace; font-size: 11px; line-height: 1.6; padding: 12px; resize: none; outline: none; margin-top: 12px; }
+/* SOC ANALYTICS */
+.analytics-page{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.row2{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;}
+.soc-panel{background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.soc-panel-hdr{height:40px;padding:0 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.soc-panel-title{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:0.12em;font-weight:600;}
+.soc-badge{font-size:9px;padding:2px 7px;border:1px solid var(--border);color:var(--dim);}
+.soc-body{flex:1;padding:12px 14px;overflow:hidden;display:flex;flex-direction:column;}
+.heatmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:4px;}
+.hm-cell{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;cursor:pointer;transition:transform 0.15s;flex-shrink:0;}
+.hm-cell:hover{transform:scale(1.15);z-index:10;}
+.hm-crit{background:rgba(248,81,73,0.85);color:#fff;border:1px solid var(--red);}
+.hm-high{background:rgba(210,153,34,0.7);color:#fff;border:1px solid var(--orange);}
+.hm-med{background:rgba(88,166,255,0.4);color:var(--blue);border:1px solid rgba(88,166,255,0.5);}
+.hm-low{background:rgba(46,160,67,0.3);color:var(--green);border:1px solid rgba(46,160,67,0.4);}
+.hm-none{background:var(--detail-bg);color:var(--dim);border:1px solid var(--border);}
+.hm-legend{display:flex;gap:12px;margin-top:10px;flex-shrink:0;}
+.hm-leg{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--dim);}
+.hm-dot{width:8px;height:8px;}
+.donut-wrap{display:flex;align-items:center;gap:16px;flex:1;}
+.donut-leg{display:flex;flex-direction:column;gap:7px;flex:1;}
+.donut-row{display:flex;align-items:center;gap:7px;font-size:10px;}
+.donut-dot{width:10px;height:10px;flex-shrink:0;}
+.donut-name{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.donut-val{color:var(--dim);flex-shrink:0;}
+.bar-chart{display:flex;flex-direction:column;gap:7px;flex:1;overflow-y:auto;}
+.bar-row{display:flex;align-items:center;gap:7px;}
+.bar-lbl{font-size:9px;color:var(--dim);width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+.bar-track{flex:1;height:16px;background:var(--detail-bg);overflow:hidden;border:1px solid var(--border);}
+.bar-fill{height:100%;display:flex;align-items:center;padding-left:5px;font-size:9px;color:rgba(255,255,255,0.8);font-weight:600;width:0;transition:width 0.8s ease;}
+.bar-cnt{font-size:9px;color:var(--dim);width:20px;flex-shrink:0;text-align:right;}
+.rdist{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center;}
+.rdist-row{display:flex;align-items:center;gap:9px;}
+.rdist-lbl{font-size:10px;width:70px;flex-shrink:0;}
+.rdist-bar{flex:1;height:20px;background:var(--detail-bg);overflow:hidden;border:1px solid var(--border);}
+.rdist-fill{height:100%;display:flex;align-items:center;padding-left:7px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.9);width:0;transition:width 0.8s ease;}
+.rdist-cnt{font-size:11px;font-weight:700;width:28px;flex-shrink:0;text-align:right;}
+.pm-list{display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;}
+.pm-row{display:flex;align-items:center;gap:7px;}
+.pm-label{font-size:10px;color:var(--text);width:80px;flex-shrink:0;}
+.pm-svc{font-size:9px;color:var(--dim);width:80px;flex-shrink:0;}
+.pm-bar{flex:1;height:14px;background:var(--detail-bg);overflow:hidden;}
+.pm-fill{height:100%;width:0;transition:width 0.8s ease;opacity:0.7;}
+.pm-cnt{font-size:10px;color:var(--dim);width:22px;text-align:right;flex-shrink:0;}
+.hm-tooltip{position:fixed;background:var(--panel);border:1px solid var(--border);padding:7px 11px;font-size:10px;color:var(--text);pointer-events:none;z-index:999;display:none;white-space:nowrap;}
 
-    /* ── SIDEBAR ── */
-    .event-sidebar { width: 340px; flex-shrink: 0; background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
-    .sidebar-hdr { height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .sidebar-title { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
-    .event-list { flex: 1; overflow-y: auto; min-height: 0; }
-    .ev-entry { padding: 14px 24px; border-bottom: 1px solid var(--border); }
-    .ev-entry.new-ev { animation: slideIn 0.4s forwards; }
-    .ev-line1 { display: flex; align-items: center; gap: 8px; font-family: 'Roboto Mono', monospace; font-size: 10px; margin-bottom: 6px; }
-    .ev-ts { color: var(--blue); flex-shrink: 0; }
-    .ev-type { font-weight: 700; text-transform: uppercase; flex-shrink: 0; padding: 2px 6px; border-radius: 4px; }
-    .ev-type.warn { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
-    .ev-type.info { background: rgba(88,166,255,0.1); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
-    .ev-line2 { font-family: 'Roboto', sans-serif; font-size: 11px; color: var(--text); line-height: 1.5; word-wrap: break-word; }
+/* NETWORK ANALYZER */
+.net-grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px;}
+.net-panel{background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.net-hdr{height:40px;padding:0 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;font-size:9px;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;flex-shrink:0;}
+.net-feed{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.net-row{background:var(--detail-bg);border:1px solid var(--border);padding:8px 11px;font-size:11px;line-height:1.4;}
+.flow-main{color:var(--text);}
+.flow-meta{color:var(--dim);font-size:9px;margin-top:3px;}
+.anomaly-row{border-color:var(--orange-border);background:var(--orange-bg);color:var(--orange);font-size:10px;}
+.anomaly-row.critical{border-color:var(--red-border);background:var(--red-bg);color:var(--red);}
 
-    /* ── FOOTER ── */
-    .footer { height: 36px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; flex-shrink: 0; }
-    .footer-text { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+/* THREAT INTEL */
+.panel-inner{flex:1;overflow-y:auto;padding:14px;}
+.threat-grid{display:flex;flex-direction:column;gap:9px;}
+.threat-card{border:1px solid var(--border);padding:11px 13px;background:var(--panel);}
+.threat-card.sev-CRITICAL{border-left:2px solid var(--red);}
+.threat-card.sev-HIGH{border-left:2px solid var(--orange);}
+.threat-card.sev-MEDIUM{border-left:2px solid var(--blue);}
+.threat-card.sev-LOW{border-left:2px solid var(--green);}
+.threat-head{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.threat-id{font-size:11px;font-weight:600;}
+.threat-sev{font-size:8px;font-weight:600;letter-spacing:0.1em;padding:2px 5px;border:1px solid;}
+.threat-desc{font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:4px;}
+.threat-ep{font-size:9px;color:var(--blue);}
 
-    .state-msg { padding: 40px 24px; font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; text-align: center; }
+/* INCIDENTS */
+.incident-table{width:100%;border-collapse:collapse;}
+.incident-table thead th{padding:7px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;}
+.incident-table tbody td{padding:7px 12px;font-size:10px;border-bottom:1px solid rgba(48,54,61,0.5);vertical-align:top;}
+.incident-table tbody tr:hover{background:var(--hover);}
 
-    /* ── NETWORK ANALYZER ── */
-    .network-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; background: var(--bg); overflow: hidden; }
-    .network-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-    .network-panel-hdr { height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; flex-shrink: 0; }
-    .network-feed { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .network-row { background: var(--detail-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: 'Roboto Mono', monospace; line-height: 1.4; }
-    .flow-main { color: var(--text); font-size: 12px; }
-    .flow-meta { color: var(--dim); font-size: 10px; margin-top: 4px; }
-    .anomaly-row { border-color: var(--orange-border); background: var(--orange-bg); color: var(--orange); font-size: 11px; }
-    .anomaly-row.critical { border-color: var(--red-border); background: var(--red-bg); color: var(--red); }
+/* POLICIES */
+.policy-list{display:flex;flex-direction:column;gap:8px;padding:14px;}
+.policy-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);background:var(--panel);}
+.policy-name{font-size:11px;font-weight:600;margin-bottom:3px;}
+.policy-desc{font-size:9px;color:var(--dim);}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border);cursor:pointer;transition:0.2s;}
+.toggle-slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:var(--dim);transition:0.2s;}
+.toggle input:checked+.toggle-slider{background:var(--green-bg);border:1px solid var(--green-border);}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px);background:var(--green);}
 
-    /* ── THREAT INTEL ── */
-    .threat-grid-wrap { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; }
-    .threat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-    .threat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 160px; }
-    .threat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .threat-id { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text); }
-    .sev-pill { font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--border); }
-    .sev-pill.CRITICAL, .sev-pill.HIGH { color: var(--red); background: var(--red-bg); border-color: var(--red-border); }
-    .sev-pill.MEDIUM { color: var(--orange); background: var(--orange-bg); border-color: var(--orange-border); }
-    .sev-pill.LOW, .sev-pill.INFO { color: var(--blue); background: rgba(88,166,255,0.1); border-color: rgba(88,166,255,0.3); }
-    .threat-desc { color: var(--dim); font-size: 12px; line-height: 1.45; flex: 1; }
-    .threat-aff { color: var(--text); font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+/* FOOTER */
+.footer{height:26px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;flex-shrink:0;gap:14px;}
+.ft{font-size:9px;color:var(--dim);letter-spacing:0.1em;text-transform:uppercase;}
+.ft span{color:var(--text);}
+.ft-sep{color:var(--border);}
+.footer-status{display:flex;align-items:center;gap:5px;margin-left:auto;}
+.status-dot{width:5px;height:5px;border-radius:50%;}
+.status-ok{background:var(--green);box-shadow:0 0 4px var(--green);}
+.status-text{font-size:9px;color:var(--green);letter-spacing:0.1em;text-transform:uppercase;}
 
-    /* ── POLICIES ── */
-    .policy-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; justify-content: center; }
-    .policy-panel { width: 100%; max-width: 820px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 0; }
-    .policy-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
-    .policy-row:last-child { border-bottom: none; }
-    .policy-meta h3 { font-size: 14px; color: var(--text); margin-bottom: 4px; }
-    .policy-meta p { font-size: 12px; color: var(--dim); line-height: 1.4; }
-    .switch { position: relative; display: inline-block; width: 52px; height: 30px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; inset: 0; background: #2b3139; transition: .2s; border: 1px solid var(--border); border-radius: 999px; }
-    .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; top: 3px; background: #c9d1d9; transition: .2s; border-radius: 50%; }
-    input:checked + .slider { background: var(--green-bg); border-color: rgba(46,160,67,0.5); }
-    input:checked + .slider:before { transform: translateX(22px); background: var(--green); }
-    input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
-
-    /* ════════════════════════════════════════════════
-       SOC ANALYTICS PAGE
-    ════════════════════════════════════════════════ */
-    .analytics-page { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
-
-    /* Row layouts */
-    .analytics-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-    .analytics-row-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
-    .analytics-row-full { display: grid; grid-template-columns: 1fr; gap: 16px; }
-
-    /* Generic panel */
-    .soc-panel {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-      display: flex; flex-direction: column; overflow: hidden; min-height: 220px;
-    }
-    .soc-panel-hdr {
-      height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-    }
-    .soc-panel-title {
-      font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim);
-      text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;
-    }
-    .soc-panel-badge {
-      font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 2px 8px;
-      border-radius: 999px; border: 1px solid var(--border); color: var(--dim);
-    }
-    .soc-panel-body { flex: 1; padding: 14px 16px; overflow: hidden; display: flex; flex-direction: column; }
-
-    /* ── RISK HEATMAP ── */
-    .heatmap-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-      gap: 4px; align-content: start;
-    }
-    .heatmap-cell {
-      width: 36px; height: 36px; border-radius: 4px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Roboto Mono', monospace; font-size: 8px; font-weight: 700;
-      transition: transform 0.15s, box-shadow 0.15s; position: relative; flex-shrink: 0;
-    }
-    .heatmap-cell:hover { transform: scale(1.15); z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
-    .heatmap-cell.risk-critical { background: rgba(248,81,73,0.85); color: #fff; border: 1px solid var(--red); }
-    .heatmap-cell.risk-high { background: rgba(210,153,34,0.7); color: #fff; border: 1px solid var(--orange); }
-    .heatmap-cell.risk-medium { background: rgba(88,166,255,0.4); color: var(--blue); border: 1px solid rgba(88,166,255,0.5); }
-    .heatmap-cell.risk-low { background: rgba(46,160,67,0.3); color: var(--green); border: 1px solid rgba(46,160,67,0.4); }
-    .heatmap-cell.risk-none { background: var(--detail-bg); color: var(--dim); border: 1px solid var(--border); }
-    .heatmap-legend { display: flex; gap: 12px; margin-top: 12px; flex-shrink: 0; }
-    .hm-leg-item { display: flex; align-items: center; gap: 5px; font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--dim); }
-    .hm-leg-dot { width: 8px; height: 8px; border-radius: 2px; }
-
-    /* ── VENDOR DONUT ── */
-    .donut-wrap { display: flex; align-items: center; gap: 20px; flex: 1; }
-    .donut-svg { flex-shrink: 0; }
-    .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
-    .donut-leg-row { display: flex; align-items: center; gap: 8px; font-family: 'Roboto Mono', monospace; font-size: 10px; }
-    .donut-leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-    .donut-leg-name { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .donut-leg-val { color: var(--dim); flex-shrink: 0; }
-
-    /* ── FIRMWARE BAR CHART ── */
-    .bar-chart { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
-    .bar-row { display: flex; align-items: center; gap: 8px; }
-    .bar-label { font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--dim); width: 180px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
-    .bar-track { flex: 1; height: 18px; background: var(--detail-bg); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
-    .bar-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 6px; font-family: 'Roboto Mono', monospace; font-size: 9px; color: rgba(255,255,255,0.8); font-weight: 600; transition: width 0.8s ease; width: 0; }
-    .bar-count { font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--dim); width: 20px; flex-shrink: 0; text-align: right; }
-
-    /* ── RISK DISTRIBUTION ── */
-    .risk-dist { display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: center; }
-    .risk-dist-row { display: flex; align-items: center; gap: 10px; }
-    .risk-dist-label { font-family: 'Roboto Mono', monospace; font-size: 10px; width: 70px; flex-shrink: 0; }
-    .risk-dist-bar { flex: 1; height: 22px; background: var(--detail-bg); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
-    .risk-dist-fill { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); transition: width 0.8s ease; width: 0; }
-    .risk-dist-count { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 700; width: 30px; flex-shrink: 0; text-align: right; }
-
-    /* ── PORT EXPOSURE MATRIX ── */
-    .port-matrix { display: flex; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto; }
-    .port-matrix-row { display: flex; align-items: center; gap: 8px; }
-    .port-matrix-label { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text); width: 100px; flex-shrink: 0; }
-    .port-matrix-svc { font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--dim); width: 80px; flex-shrink: 0; }
-    .port-matrix-bar { flex: 1; height: 16px; background: var(--detail-bg); border-radius: 2px; overflow: hidden; }
-    .port-matrix-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; width: 0; }
-    .port-matrix-count { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--dim); width: 24px; text-align: right; flex-shrink: 0; }
-
-    /* ── SCAN HISTORY SPARKLINE ── */
-    .sparkline-wrap { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-    .sparkline-svg { width: 100%; flex: 1; min-height: 80px; }
-
-    /* ── TOOLTIP ── */
-    .hm-tooltip {
-      position: fixed; background: var(--panel); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px; font-family: 'Roboto Mono', monospace;
-      font-size: 10px; color: var(--text); pointer-events: none; z-index: 999;
-      display: none; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-    }
-
-    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes criticalPulse {
-      0% { box-shadow: inset 0 0 0 rgba(248,81,73,0); }
-      50% { box-shadow: inset 0 0 30px rgba(248,81,73,0.18); }
-      100% { box-shadow: inset 0 0 0 rgba(248,81,73,0); }
-    }
-    @keyframes barGrow { from { width: 0; } }
-  </style>
+@keyframes scanPulse{0%{opacity:0.4;}50%{opacity:1;}100%{opacity:0.4;}}
+.scanning{animation:scanPulse 0.8s ease-in-out infinite;}
+</style>
 </head>
 <body>
 
 <div class="hm-tooltip" id="hm-tooltip"></div>
 
-<header class="topbar">
-  <div class="topbar-left">
-    <div class="logo-dot"></div>
-    <span class="logo-sin">SIN</span>
-    <div class="vdivider"></div>
-    <div class="nav-tabs">
-      <div class="tab active" onclick="switchPage('edr', this)">EDR Overview</div>
-      <div class="tab" onclick="switchPage('analytics', this)">SOC Analytics</div>
-      <div class="tab" onclick="switchPage('threat', this)">Threat Intel</div>
-      <div class="tab" onclick="switchPage('network', this)">Network Analyzer</div>
-      <div class="tab" onclick="switchPage('policy', this)">Policies</div>
-    </div>
+<!-- KEY OVERLAY -->
+<div id="key-overlay">
+  <div class="key-box">
+    <div class="key-box-title">// authentication required</div>
+    <div class="key-box-sub">Enter your SIN API key to access the dashboard.<br>This is the value of SIN_API_KEY in your .env file.</div>
+    <input class="key-input" id="key-input" type="password" placeholder="SIN_API_KEY" autocomplete="off">
+    <button class="key-btn" id="key-submit">Connect to SIN Engine →</button>
+    <div class="key-err" id="key-err"></div>
   </div>
+</div>
+
+<!-- INSPECT MODAL -->
+<div id="inspect-modal" class="hidden">
+  <div class="inspect-box">
+    <div class="inspect-header">
+      <span class="inspect-title"><i class="fas fa-microchip" style="margin-right:6px;font-size:8px;"></i>Device Inspection</span>
+      <button class="inspect-close" onclick="closeInspect()">✕ Close</button>
+    </div>
+    <div class="inspect-body" id="inspect-body"></div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span class="logo-text">SIN</span>
+  </div>
+  <nav class="nav-tabs">
+    <div class="nav-tab active" data-tab="edr">EDR Overview</div>
+    <div class="nav-tab" data-tab="analytics">SOC Analytics</div>
+    <div class="nav-tab" data-tab="threats">Threat Intel</div>
+    <div class="nav-tab" data-tab="network">Network Analyzer</div>
+    <div class="nav-tab" data-tab="incidents">Incident Log</div>
+    <div class="nav-tab" data-tab="policies">Policy Engine</div>
+  </nav>
   <div class="topbar-right">
-    <input id="subnet-input" class="subnet-input" type="text" value="192.168.30.0/24" spellcheck="false">
-    <button id="scan-btn" class="scan-btn" onclick="triggerScan()">&#x27F2; SCAN NOW</button>
+    <span class="subnet-label">Target</span>
+    <input class="subnet-input" id="subnet-input" type="text" value="192.168.30.0/24">
+    <button class="scan-btn" id="scan-btn"><i class="fas fa-crosshairs" style="margin-right:5px;font-size:9px;"></i>Scan Now</button>
+    <div class="topbar-clock" id="clock">00:00:00 IST</div>
   </div>
 </header>
 
-<section class="stat-cards">
-  <div class="stat-card">
-    <div class="stat-label">Total Endpoints</div>
-    <div class="stat-value" id="stat-total">&#8212;</div>
-    <div class="stat-sub">Discovered on perimeter</div>
-  </div>
-  <div class="stat-card" id="critical-card">
-    <div class="stat-label">Critical Risks</div>
-    <div class="stat-value" id="stat-critical" style="color:var(--red)">&#8212;</div>
-    <div class="stat-sub">Active threats unmitigated</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Active Mitigations</div>
-    <div class="stat-value" id="stat-mit" style="color:var(--green)">&#8212;</div>
-    <div class="stat-sub">Endpoints quarantined</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">SIN Uptime</div>
-    <div class="stat-value" id="stat-uptime">00:00:00</div>
-    <div class="stat-sub" id="stat-uptime-sub">Last scan &#8212;</div>
-  </div>
-  <div class="stat-card stat-card-stream">
-    <div class="stream-header">
-      <span class="stat-label">&#x25C8; Activity Stream</span>
-    </div>
-    <div class="mini-events" id="mini-events">
-      <div class="mini-ev" style="color:var(--dim)">Awaiting telemetry...</div>
-    </div>
-  </div>
-</section>
+<!-- STAT ROW -->
+<div class="stat-row">
+  <div class="stat-card"><div class="stat-indicator ind-dim"></div><span class="stat-label">Total Endpoints</span><span class="stat-value blue" id="stat-total">—</span><span class="stat-sub" id="stat-total-sub">loading...</span></div>
+  <div class="stat-card"><div class="stat-indicator ind-red"></div><span class="stat-label">Critical Risks</span><span class="stat-value red" id="stat-critical">—</span><span class="stat-sub" id="stat-critical-sub" style="color:var(--red);opacity:0.7;">loading...</span></div>
+  <div class="stat-card"><div class="stat-indicator ind-orange"></div><span class="stat-label">Vulnerable</span><span class="stat-value orange" id="stat-vuln">—</span><span class="stat-sub" id="stat-vuln-sub">loading...</span></div>
+  <div class="stat-card"><div class="stat-indicator ind-green"></div><span class="stat-label">Active Mitigations</span><span class="stat-value green" id="stat-isolated">—</span><span class="stat-sub" id="stat-isolated-sub">loading...</span></div>
+  <div class="stat-card"><div class="stat-indicator ind-blue"></div><span class="stat-label">SIN Uptime</span><span class="stat-value" id="uptime" style="font-size:18px;">00:00:00</span><span class="stat-sub">engine nominal · elastic slate</span></div>
+  <div class="stat-card"><div class="stat-indicator ind-orange"></div><span class="stat-label">Activity Stream</span><div style="margin-top:4px;" id="activity-log"><div class="activity-line"><span class="ts">--:--:--</span><span class="ok">[OK]</span> Connecting...</div></div></div>
+</div>
 
-<main class="main-area">
+<!-- MAIN -->
+<div class="main-area">
 
-  <!-- PAGE 1: EDR OVERVIEW -->
-  <div id="page-edr" class="page-content active">
-    <div style="display:flex; flex:1; overflow:hidden;">
-      <section class="edr-panel">
-        <div class="col-headers">
-          <div class="col-header">Endpoint</div>
-          <div class="col-header">MAC / OUI</div>
-          <div class="col-header">Fingerprint</div>
-          <div class="col-header">Vulnerabilities</div>
-          <div class="col-header">Network State</div>
-          <div class="col-header" style="text-align:right;">Risk</div>
-          <div class="col-header" style="text-align:center;">Controls</div>
+  <!-- EDR -->
+  <div class="tab-panel active" id="tab-edr" style="flex-direction:row;">
+    <div class="table-section">
+      <div class="section-hdr">
+        <span class="section-title"><i class="fas fa-server" style="margin-right:6px;font-size:8px;color:var(--blue);"></i>Endpoint Registry</span>
+        <div class="section-meta">
+          <span class="section-badge" id="hdr-scan-time">LOADING...</span>
+          <span class="section-badge" id="hdr-alive" style="color:var(--green);border-color:var(--green-border);background:var(--green-bg);">— ALIVE</span>
+          <span class="section-badge" id="hdr-critical" style="color:var(--red);border-color:var(--red-border);background:var(--red-bg);">— CRITICAL</span>
+          <span class="section-badge" id="hdr-scanning" style="display:none;color:var(--orange);border-color:var(--orange-border);background:var(--orange-bg);"><span class="scanning">● SCANNING</span></span>
         </div>
-        <div class="device-list" id="device-list">
-          <div class="state-msg">No devices found. Run a scan.</div>
-        </div>
-      </section>
-      <aside class="event-sidebar">
-        <div class="sidebar-hdr">
-          <span class="sidebar-title">&#x25C8; Live Event Stream</span>
-        </div>
-        <div class="event-list" id="event-list"></div>
-      </aside>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>MAC / OUI</th><th>Fingerprint</th><th>Vulnerabilities</th><th>Network State</th><th>Risk</th><th>Controls</th></tr></thead>
+          <tbody id="device-tbody"><tr><td colspan="7" class="empty-state">CONNECTING TO ENGINE...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="section-hdr">
+        <span class="section-title"><i class="fas fa-stream" style="margin-right:6px;font-size:8px;color:var(--blue);"></i>Live Event Stream</span>
+        <div class="section-meta"><span class="section-badge" id="ws-badge">● CONNECTING</span></div>
+      </div>
+      <div class="event-stream" id="event-stream"><div class="sidebar-divider"><span class="divider-label">awaiting connection...</span></div></div>
     </div>
   </div>
 
-  <!-- PAGE 2: SOC ANALYTICS -->
-  <div id="page-analytics" class="page-content">
-    <div class="analytics-page" id="analytics-page">
-
-      <!-- Row 1: Heatmap + Risk Distribution + Vendor Donut -->
-      <div class="analytics-row-3">
-
-        <!-- Risk Heatmap -->
-        <div class="soc-panel" style="min-height:260px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">⬛ Endpoint Risk Heatmap</span>
-            <span class="soc-panel-badge" id="hm-badge">0 endpoints</span>
-          </div>
-          <div class="soc-panel-body">
+  <!-- SOC ANALYTICS -->
+  <div class="tab-panel" id="tab-analytics">
+    <div class="analytics-page">
+      <div class="row3">
+        <div class="soc-panel" style="min-height:230px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">⬛ Risk Heatmap</span><span class="soc-badge" id="hm-badge">0 endpoints</span></div>
+          <div class="soc-body">
             <div class="heatmap-grid" id="heatmap-grid"></div>
-            <div class="heatmap-legend">
-              <div class="hm-leg-item"><div class="hm-leg-dot" style="background:rgba(248,81,73,0.85)"></div>Critical</div>
-              <div class="hm-leg-item"><div class="hm-leg-dot" style="background:rgba(210,153,34,0.7)"></div>High</div>
-              <div class="hm-leg-item"><div class="hm-leg-dot" style="background:rgba(88,166,255,0.4)"></div>Medium</div>
-              <div class="hm-leg-item"><div class="hm-leg-dot" style="background:rgba(46,160,67,0.3)"></div>Low</div>
+            <div class="hm-legend">
+              <div class="hm-leg"><div class="hm-dot" style="background:rgba(248,81,73,0.85);"></div>Critical</div>
+              <div class="hm-leg"><div class="hm-dot" style="background:rgba(210,153,34,0.7);"></div>High</div>
+              <div class="hm-leg"><div class="hm-dot" style="background:rgba(88,166,255,0.4);"></div>Medium</div>
+              <div class="hm-leg"><div class="hm-dot" style="background:rgba(46,160,67,0.3);"></div>Low</div>
             </div>
           </div>
         </div>
-
-        <!-- Risk Distribution Bars -->
-        <div class="soc-panel" style="min-height:260px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">📊 Risk Distribution</span>
-            <span class="soc-panel-badge" id="rd-badge">Fleet overview</span>
-          </div>
-          <div class="soc-panel-body">
-            <div class="risk-dist" id="risk-dist">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan to populate</div>
-            </div>
-          </div>
+        <div class="soc-panel" style="min-height:230px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">📊 Risk Distribution</span><span class="soc-badge" id="rd-badge">Fleet</span></div>
+          <div class="soc-body"><div class="rdist" id="risk-dist"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
-        <!-- Vendor Donut -->
-        <div class="soc-panel" style="min-height:260px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">🏭 Vendor Fleet Breakdown</span>
-            <span class="soc-panel-badge" id="vendor-badge">0 vendors</span>
-          </div>
-          <div class="soc-panel-body">
-            <div class="donut-wrap" id="donut-wrap">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan to populate</div>
-            </div>
-          </div>
+        <div class="soc-panel" style="min-height:230px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">🏭 Vendor Fleet</span><span class="soc-badge" id="vendor-badge">0 vendors</span></div>
+          <div class="soc-body"><div class="donut-wrap" id="donut-wrap"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
       </div>
-
-      <!-- Row 2: Firmware Chart + Port Exposure -->
-      <div class="analytics-row-2">
-
-        <!-- Firmware Distribution -->
-        <div class="soc-panel" style="min-height:240px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">💾 Firmware Version Distribution</span>
-            <span class="soc-panel-badge" id="fw-badge">0 versions</span>
-          </div>
-          <div class="soc-panel-body">
-            <div class="bar-chart" id="fw-chart">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan to populate</div>
-            </div>
-          </div>
+      <div class="row2">
+        <div class="soc-panel" style="min-height:210px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">💾 Firmware Distribution</span><span class="soc-badge" id="fw-badge">0 versions</span></div>
+          <div class="soc-body"><div class="bar-chart" id="fw-chart"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
-        <!-- Port Exposure Matrix -->
-        <div class="soc-panel" style="min-height:240px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">🔌 Port Exposure Matrix</span>
-            <span class="soc-panel-badge" id="port-badge">Attack surface</span>
-          </div>
-          <div class="soc-panel-body">
-            <div class="port-matrix" id="port-matrix">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan to populate</div>
-            </div>
-          </div>
+        <div class="soc-panel" style="min-height:210px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">🔌 Port Exposure Matrix</span><span class="soc-badge" id="port-badge">Attack surface</span></div>
+          <div class="soc-body"><div class="pm-list" id="port-matrix"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
       </div>
-
-      <!-- Row 3: Device Type + MAC Resolution + Vuln Summary -->
-      <div class="analytics-row-3">
-
-        <!-- Device Type Breakdown -->
-        <div class="soc-panel" style="min-height:180px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">📡 Device Type Breakdown</span>
-          </div>
-          <div class="soc-panel-body">
-            <div class="bar-chart" id="dtype-chart">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan</div>
-            </div>
-          </div>
+      <div class="row3">
+        <div class="soc-panel" style="min-height:150px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">📡 Device Types</span></div>
+          <div class="soc-body"><div class="bar-chart" id="dtype-chart"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
-        <!-- MAC Resolution Status -->
-        <div class="soc-panel" style="min-height:180px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">🔍 MAC Resolution Status</span>
-          </div>
-          <div class="soc-panel-body" style="justify-content:center;">
-            <div id="mac-status" style="display:flex; flex-direction:column; gap:10px; justify-content:center; flex:1;">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan</div>
-            </div>
-          </div>
+        <div class="soc-panel" style="min-height:150px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">🔍 MAC Resolution</span></div>
+          <div class="soc-body" style="justify-content:center;"><div id="mac-status"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
-
-        <!-- Top Vulnerable Devices -->
-        <div class="soc-panel" style="min-height:180px;">
-          <div class="soc-panel-hdr">
-            <span class="soc-panel-title">⚠️ Top Risk Endpoints</span>
-          </div>
-          <div class="soc-panel-body">
-            <div id="top-risk" style="display:flex; flex-direction:column; gap:6px; flex:1; overflow-y:auto;">
-              <div class="state-msg" style="padding:20px 0; font-size:10px;">Run a scan</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- PAGE 3: THREAT INTEL -->
-  <div id="page-threat" class="page-content">
-    <div class="threat-grid-wrap">
-      <div class="threat-grid" id="threat-grid">
-        <div class="state-msg">Loading threat intelligence...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PAGE 4: NETWORK ANALYZER -->
-  <div id="page-network" class="page-content">
-    <div class="network-grid">
-      <section class="network-panel">
-        <div class="network-panel-hdr">⚡ Live Traffic Flows</div>
-        <div class="network-feed" id="flow-list">
-          <div class="state-msg" style="padding:20px;">Awaiting live packet flow telemetry...</div>
-        </div>
-      </section>
-      <section class="network-panel">
-        <div class="network-panel-hdr">⚠️ Protocol Anomalies</div>
-        <div class="network-feed" id="anomaly-list">
-          <div class="state-msg" style="padding:20px;">No anomalies detected yet.</div>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <!-- PAGE 5: POLICIES -->
-  <div id="page-policy" class="page-content">
-    <div class="policy-wrap">
-      <div class="policy-panel" id="policy-panel">
-        <div class="policy-row">
-          <div class="policy-meta">
-            <h3>Auto-Quarantine Critical</h3>
-            <p>Automatically isolate endpoints when risk score exceeds 90.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="policy-auto-quarantine" onchange="togglePolicy('auto_quarantine_critical', this.checked, this)">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="policy-row">
-          <div class="policy-meta">
-            <h3>Network Discovery</h3>
-            <p>Enable or disable active network discovery scans from SIN.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="policy-network-discovery" onchange="togglePolicy('network_discovery_enabled', this.checked, this)">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="policy-row">
-          <div class="policy-meta">
-            <h3>Strict Whitelist Mode</h3>
-            <p>Restrict operations to explicitly trusted devices only.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="policy-strict-whitelist" onchange="togglePolicy('strict_whitelist_mode', this.checked, this)">
-            <span class="slider"></span>
-          </label>
+        <div class="soc-panel" style="min-height:150px;">
+          <div class="soc-panel-hdr"><span class="soc-panel-title">⚠️ Top Risk Endpoints</span></div>
+          <div class="soc-body"><div id="top-risk" style="display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;"><div class="empty-state" style="padding:10px 0;font-size:9px;">Run a scan</div></div></div>
         </div>
       </div>
     </div>
   </div>
 
-</main>
+  <!-- THREATS -->
+  <div class="tab-panel" id="tab-threats">
+    <div class="section-hdr">
+      <span class="section-title"><i class="fas fa-bug" style="margin-right:6px;font-size:8px;color:var(--red);"></i>Threat Intelligence</span>
+      <div class="section-meta"><span class="section-badge">TOP ACTIVE THREATS</span></div>
+    </div>
+    <div class="panel-inner"><div class="threat-grid" id="threat-grid"><div class="empty-state">LOADING...</div></div></div>
+  </div>
 
+  <!-- NETWORK ANALYZER -->
+  <div class="tab-panel" id="tab-network">
+    <div class="net-grid">
+      <div class="net-panel">
+        <div class="net-hdr"><i class="fas fa-bolt" style="margin-right:7px;color:var(--orange);font-size:8px;"></i>Live Traffic Flows</div>
+        <div class="net-feed" id="flow-list"><div class="empty-state" style="padding:20px;font-size:9px;">Awaiting live packet flow telemetry...</div></div>
+      </div>
+      <div class="net-panel">
+        <div class="net-hdr"><i class="fas fa-exclamation-triangle" style="margin-right:7px;color:var(--red);font-size:8px;"></i>Protocol Anomalies</div>
+        <div class="net-feed" id="anomaly-list"><div class="empty-state" style="padding:20px;font-size:9px;">No anomalies detected yet.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCIDENTS -->
+  <div class="tab-panel" id="tab-incidents">
+    <div class="section-hdr">
+      <span class="section-title"><i class="fas fa-list-alt" style="margin-right:6px;font-size:8px;color:var(--orange);"></i>Incident Log</span>
+      <div class="section-meta"><span class="section-badge">LAST 200 EVENTS</span></div>
+    </div>
+    <div class="table-wrap">
+      <table class="incident-table">
+        <thead><tr><th>Timestamp</th><th>IP Address</th><th>Event Type</th><th>Severity</th><th>Description</th></tr></thead>
+        <tbody id="incident-tbody"><tr><td colspan="5" class="empty-state">LOADING...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- POLICIES -->
+  <div class="tab-panel" id="tab-policies">
+    <div class="section-hdr">
+      <span class="section-title"><i class="fas fa-shield-alt" style="margin-right:6px;font-size:8px;color:var(--green);"></i>Policy Engine</span>
+      <div class="section-meta"><span class="section-badge" id="policy-status">LOADING...</span></div>
+    </div>
+    <div class="policy-list" id="policy-list"><div class="empty-state">LOADING...</div></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
 <footer class="footer">
-  <span class="footer-text">SIN V1.5 &middot; Elastic Slate Build &middot; Multi-Threaded Core</span>
+  <span class="ft"><span>SIN V2.0</span></span>
+  <span class="ft-sep ft">·</span>
+  <span class="ft">ELASTIC SLATE BUILD</span>
+  <span class="ft-sep ft">·</span>
+  <span class="ft">SUBNET <span id="footer-subnet">—</span></span>
+  <span class="ft-sep ft">·</span>
+  <span class="ft">LAST SCAN <span id="footer-scan">—</span></span>
+  <span class="ft-sep ft">·</span>
+  <span class="ft">ENDPOINTS <span id="footer-endpoints">—</span></span>
+  <div class="footer-status">
+    <div class="status-dot status-ok" id="footer-dot"></div>
+    <span class="status-text" id="footer-status-text">CONNECTING...</span>
+  </div>
 </footer>
 
 <script>
-  const API = "/api";
-  const API_KEY = "a634fd2d20eb8dd013eab32bdbf9529694abb5e46a35dd92d531faf34f1f0291";
+const API='/api', WS='/ws/events';
+let API_KEY=sessionStorage.getItem('sin_api_key')||'';
+let ws=null,scanPoll=null,devices=[],flowBuf=[],anomalyBuf=[];
+const startT=Date.now();
+const VC=['#58a6ff','#f85149','#d29922','#2ea043','#8957e5','#d97757','#3fb950','#e3b341'];
 
-  var devices = []; var events = []; var threats = []; var policies = {};
-  var scanning = false; var scanTimer = null;
-  var uptimeSecs = 0; var expandedIPs = new Set(); var auditCache = {};
+const pad=n=>String(n).padStart(2,'0');
+function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function istNow(){const n=new Date();return new Date(n.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));}
+function fmtIst(ts){try{return new Date(ts).toLocaleTimeString('en-IN',{hour12:false,timeZone:'Asia/Kolkata'});}catch(e){return String(ts||'');}}
 
-  const VENDOR_COLORS = [
-    '#58a6ff','#f85149','#d29922','#2ea043','#8957e5',
-    '#d97757','#3fb950','#e3b341','#f0883e','#a5d6ff'
-  ];
+// Clock
+function tick(){
+  const t=istNow();
+  document.getElementById('clock').textContent=`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())} IST`;
+  const e=Math.floor((Date.now()-startT)/1000);
+  document.getElementById('uptime').textContent=`${pad(Math.floor(e/3600))}:${pad(Math.floor((e%3600)/60))}:${pad(e%60)}`;
+}
+tick(); setInterval(tick,1000);
 
-  function switchPage(pageId, tabEl) {
-    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-    if (tabEl) tabEl.classList.add('active');
-    document.querySelectorAll('.page-content').forEach(function(p) { p.classList.remove('active'); });
-    var pg = document.getElementById('page-' + pageId);
-    if (pg) pg.classList.add('active');
-    if (pageId === 'analytics') renderAnalytics();
-  }
+// API
+async function api(path,opts={}){
+  const r=await fetch(API+path,{headers:{'X-API-Key':API_KEY,'Content-Type':'application/json',...(opts.headers||{})},  ...opts});
+  if(r.status===401){showKey('Invalid API key.');throw new Error('401');}
+  return r.json();
+}
 
-  setInterval(function() {
-    uptimeSecs++;
-    var h = String(Math.floor(uptimeSecs / 3600)).padStart(2,'0');
-    var m = String(Math.floor((uptimeSecs % 3600) / 60)).padStart(2,'0');
-    var s = String(uptimeSecs % 60).padStart(2,'0');
-    document.getElementById('stat-uptime').textContent = h + ':' + m + ':' + s;
-  }, 1000);
+// Key overlay
+function showKey(msg=''){document.getElementById('key-overlay').classList.remove('hidden');if(msg)document.getElementById('key-err').textContent=msg;}
+function hideKey(){document.getElementById('key-overlay').classList.add('hidden');}
+document.getElementById('key-submit').addEventListener('click',async()=>{
+  const k=document.getElementById('key-input').value.trim();
+  if(!k){document.getElementById('key-err').textContent='Key cannot be empty.';return;}
+  const btn=document.getElementById('key-submit');
+  btn.textContent='Verifying...';btn.disabled=true;
+  try{
+    const r=await fetch(API+'/health',{headers:{'X-API-Key':k}});
+    if(r.status===401){document.getElementById('key-err').textContent='Invalid API key.';btn.textContent='Connect to SIN Engine →';btn.disabled=false;return;}
+    API_KEY=k;sessionStorage.setItem('sin_api_key',k);hideKey();init();
+  }catch(e){document.getElementById('key-err').textContent='Cannot reach SIN engine.';btn.textContent='Connect to SIN Engine →';btn.disabled=false;}
+});
+document.getElementById('key-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('key-submit').click();});
 
-  function fetchAll() { fetchDevices(); fetchEvents(); fetchStats(); fetchThreats(); fetchPolicies(); }
+// Init
+async function init(){
+  await Promise.all([loadStats(),loadDevices(),loadEvents()]);
+  connectWS(); loadThreats(); loadIncidents(); loadPolicies();
+  setInterval(loadStats,15000); setInterval(loadDevices,60000);
+}
+if(API_KEY)init(); else showKey();
 
-  function fetchDevices() {
-    fetch(API + '/devices', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) { devices = d; renderDevices(); renderAnalytics(); })
-      .catch(function() {
-        document.getElementById('device-list').innerHTML = '<div class="state-msg" style="color:var(--red)">&#x26A0; Cannot reach API</div>';
-      });
-  }
-
-  function fetchEvents() {
-    fetch(API + '/events', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) {
-        events = d.slice().sort(function(a,b) { return new Date(b.timestamp) - new Date(a.timestamp); });
-        renderEvents();
-      }).catch(function() {});
-  }
-
-  function fetchStats() {
-    fetch(API + '/stats', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(s) {
-        document.getElementById('stat-total').textContent = s.total_devices != null ? s.total_devices : '—';
-        document.getElementById('stat-critical').textContent = s.critical != null ? s.critical : '—';
-        document.getElementById('stat-mit').textContent = s.isolated != null ? s.isolated : '—';
-        var cc = document.getElementById('critical-card');
-        if (cc) { if ((s.critical||0) > 0) cc.classList.add('critical-pulse'); else cc.classList.remove('critical-pulse'); }
-        if (s.scanning && !scanning) startScanPoll();
-      }).catch(function() {});
-  }
-
-  function fetchThreats() {
-    fetch(API + '/threats', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) { threats = Array.isArray(d) ? d : []; renderThreats(); })
-      .catch(function() {
-        var g = document.getElementById('threat-grid');
-        if (g) g.innerHTML = '<div class="state-msg" style="color:var(--red)">Unable to load threat intelligence.</div>';
-      });
-  }
-
-  function renderThreats() {
-    var grid = document.getElementById('threat-grid'); if (!grid) return;
-    if (!threats || threats.length === 0) { grid.innerHTML = '<div class="state-msg">No active threats detected.</div>'; return; }
-    grid.innerHTML = threats.map(function(t) {
-      var sev = e((t.severity || 'INFO').toUpperCase());
-      return '<article class="threat-card">'
-        + '<div class="threat-top"><div class="threat-id">' + e(t.id || 'Unknown') + '</div><span class="sev-pill ' + sev + '">' + sev + '</span></div>'
-        + '<div class="threat-desc">' + e(t.description || 'No description available.') + '</div>'
-        + '<div class="threat-aff">Affected Endpoints: ' + e(String(t.affected_endpoints || 0)) + '</div>'
-        + '</article>';
-    }).join('');
-  }
-
-  function fetchPolicies() {
-    fetch(API + '/policies', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-      .then(function(d) { policies = d || {}; renderPolicies(); })
-      .catch(function() {});
-  }
-
-  function renderPolicies() {
-    var autoQ = document.getElementById('policy-auto-quarantine');
-    var netD = document.getElementById('policy-network-discovery');
-    var strict = document.getElementById('policy-strict-whitelist');
-    if (autoQ) autoQ.checked = !!policies.auto_quarantine_critical;
-    if (netD) netD.checked = !!policies.network_discovery_enabled;
-    if (strict) strict.checked = !!policies.strict_whitelist_mode;
-  }
-
-  function togglePolicy(policyName, value, inputEl) {
-    if (inputEl) inputEl.disabled = true;
-    fetch(API + '/policies/' + policyName, {
-      method: 'POST', headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
-      body: JSON.stringify({value: !!value})
-    })
-    .then(function(r) { if (!r.ok) throw 0; return r.json(); })
-    .then(function(resp) { policies = resp.policies || policies; renderPolicies(); })
-    .catch(function() { if (inputEl) inputEl.checked = !value; alert('Failed to update policy.'); })
-    .finally(function() { if (inputEl) inputEl.disabled = false; });
-  }
-
-  /* ═══════════════════════════════════════════════════
-     SOC ANALYTICS RENDERER
-  ═══════════════════════════════════════════════════ */
-  function renderAnalytics() {
-    if (!devices || devices.length === 0) return;
-    renderHeatmap();
-    renderRiskDist();
-    renderVendorDonut();
-    renderFirmwareChart();
-    renderPortMatrix();
-    renderDeviceTypeChart();
-    renderMacStatus();
-    renderTopRisk();
-  }
-
-  /* ── Risk Heatmap ── */
-  function renderHeatmap() {
-    var grid = document.getElementById('heatmap-grid'); if (!grid) return;
-    var badge = document.getElementById('hm-badge');
-    if (badge) badge.textContent = devices.length + ' endpoints';
-    grid.innerHTML = devices.map(function(d) {
-      var score = d.risk_score || 0;
-      var cls = score >= 80 ? 'risk-critical' : score >= 50 ? 'risk-high' : score >= 25 ? 'risk-medium' : score > 0 ? 'risk-low' : 'risk-none';
-      var lastOctet = (d.ip_address || '').split('.').pop();
-      return '<div class="heatmap-cell ' + cls + '" '
-        + 'onmouseenter="showTooltip(event,\'' + e(d.ip_address) + ' — ' + e(d.vendor || 'Unknown') + ' — Risk: ' + score + '\')"'
-        + 'onmouseleave="hideTooltip()">'
-        + lastOctet + '</div>';
-    }).join('');
-  }
-
-  /* ── Risk Distribution ── */
-  function renderRiskDist() {
-    var el = document.getElementById('risk-dist'); if (!el) return;
-    var counts = {CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0};
-    devices.forEach(function(d) {
-      var lvl = (d.risk_level || 'LOW').toUpperCase();
-      if (counts[lvl] !== undefined) counts[lvl]++;
-      else counts.LOW++;
-    });
-    var total = devices.length || 1;
-    var rows = [
-      {label: 'CRITICAL', count: counts.CRITICAL, color: 'var(--red)'},
-      {label: 'HIGH',     count: counts.HIGH,     color: 'var(--orange)'},
-      {label: 'MEDIUM',   count: counts.MEDIUM,   color: 'var(--blue)'},
-      {label: 'LOW',      count: counts.LOW,       color: 'var(--green)'},
-    ];
-    var badge = document.getElementById('rd-badge');
-    if (badge) badge.textContent = total + ' devices';
-    el.innerHTML = rows.map(function(r) {
-      var pct = Math.round((r.count / total) * 100);
-      return '<div class="risk-dist-row">'
-        + '<div class="risk-dist-label" style="color:' + r.color + '">' + r.label + '</div>'
-        + '<div class="risk-dist-bar"><div class="risk-dist-fill" data-w="' + pct + '" style="background:' + r.color + ';width:0%">' + (r.count > 0 ? r.count : '') + '</div></div>'
-        + '<div class="risk-dist-count" style="color:' + r.color + '">' + r.count + '</div>'
-        + '</div>';
-    }).join('');
-    requestAnimationFrame(function() {
-      el.querySelectorAll('.risk-dist-fill').forEach(function(f) { f.style.width = f.getAttribute('data-w') + '%'; });
-    });
-  }
-
-  /* ── Vendor Donut Chart ── */
-  function renderVendorDonut() {
-    var wrap = document.getElementById('donut-wrap'); if (!wrap) return;
-    var counts = {};
-    devices.forEach(function(d) {
-      var v = (d.vendor || d.manufacturer || 'Unknown').toUpperCase();
-      counts[v] = (counts[v] || 0) + 1;
-    });
-    var entries = Object.entries(counts).sort(function(a,b) { return b[1]-a[1]; });
-    var total = devices.length || 1;
-    var badge = document.getElementById('vendor-badge');
-    if (badge) badge.textContent = entries.length + ' vendor' + (entries.length !== 1 ? 's' : '');
-
-    var size = 120; var cx = size/2; var cy = size/2; var r = 42; var innerR = 24;
-    var slices = ''; var offset = 0;
-    entries.forEach(function(entry, i) {
-      var pct = entry[1] / total;
-      var angle = pct * 2 * Math.PI;
-      var x1 = cx + r * Math.sin(offset);
-      var y1 = cy - r * Math.cos(offset);
-      offset += angle;
-      var x2 = cx + r * Math.sin(offset);
-      var y2 = cy - r * Math.cos(offset);
-      var largeArc = angle > Math.PI ? 1 : 0;
-      var color = VENDOR_COLORS[i % VENDOR_COLORS.length];
-      slices += '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A' + r + ',' + r + ' 0 ' + largeArc + ',1 ' + x2 + ',' + y2 + ' Z" fill="' + color + '" opacity="0.85"/>';
-    });
-    slices += '<circle cx="' + cx + '" cy="' + cy + '" r="' + innerR + '" fill="var(--panel)"/>';
-    slices += '<text x="' + cx + '" y="' + (cy+4) + '" text-anchor="middle" font-family="Roboto Mono,monospace" font-size="11" font-weight="700" fill="var(--text)">' + total + '</text>';
-
-    var legendHtml = entries.slice(0, 6).map(function(entry, i) {
-      var color = VENDOR_COLORS[i % VENDOR_COLORS.length];
-      var pct = Math.round((entry[1]/total)*100);
-      return '<div class="donut-leg-row"><div class="donut-leg-dot" style="background:' + color + '"></div><div class="donut-leg-name">' + e(entry[0]) + '</div><div class="donut-leg-val">' + entry[1] + ' (' + pct + '%)</div></div>';
-    }).join('');
-
-    wrap.innerHTML = '<svg class="donut-svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' + slices + '</svg>'
-      + '<div class="donut-legend">' + legendHtml + '</div>';
-  }
-
-  /* ── Firmware Distribution ── */
-  function renderFirmwareChart() {
-    var el = document.getElementById('fw-chart'); if (!el) return;
-    var counts = {};
-    devices.forEach(function(d) {
-      var fw = d.firmware || 'Unknown';
-      if (fw.length > 35) fw = fw.substring(0, 35) + '…';
-      counts[fw] = (counts[fw] || 0) + 1;
-    });
-    var entries = Object.entries(counts).sort(function(a,b) { return b[1]-a[1]; });
-    var maxCount = entries.length > 0 ? entries[0][1] : 1;
-    var badge = document.getElementById('fw-badge');
-    if (badge) badge.textContent = entries.length + ' version' + (entries.length !== 1 ? 's' : '');
-
-    el.innerHTML = entries.map(function(entry, i) {
-      var pct = Math.round((entry[1] / maxCount) * 100);
-      var color = entry[0] === 'Unknown' ? 'var(--dim)' : VENDOR_COLORS[i % VENDOR_COLORS.length];
-      return '<div class="bar-row">'
-        + '<div class="bar-label" title="' + e(entry[0]) + '">' + e(entry[0]) + '</div>'
-        + '<div class="bar-track"><div class="bar-fill" data-w="' + pct + '" style="background:' + color + ';width:0%">' + (pct > 15 ? entry[1] : '') + '</div></div>'
-        + '<div class="bar-count">' + entry[1] + '</div>'
-        + '</div>';
-    }).join('');
-    requestAnimationFrame(function() {
-      el.querySelectorAll('.bar-fill').forEach(function(f) { f.style.width = f.getAttribute('data-w') + '%'; });
-    });
-  }
-
-  /* ── Port Exposure Matrix ── */
-  function renderPortMatrix() {
-    var el = document.getElementById('port-matrix'); if (!el) return;
-    var portNames = {554:'RTSP',34567:'DVR-Web',80:'HTTP',443:'HTTPS',8000:'Hikvision',8080:'HTTP-Alt',22:'SSH',23:'Telnet',21:'FTP',1883:'MQTT',37777:'Dahua-SDK'};
-    var portCounts = {};
-    devices.forEach(function(d) {
-      (d.open_ports || []).forEach(function(p) {
-        portCounts[p] = (portCounts[p] || 0) + 1;
-      });
-    });
-    var entries = Object.entries(portCounts).sort(function(a,b) { return b[1]-a[1]; }).slice(0, 10);
-    var maxCount = entries.length > 0 ? entries[0][1] : 1;
-    var totalDevices = devices.length || 1;
-    var badge = document.getElementById('port-badge');
-    if (badge) badge.textContent = entries.length + ' exposed ports';
-    var dangerPorts = [554, 23, 21, 8000, 34567, 37777];
-
-    el.innerHTML = entries.map(function(entry) {
-      var port = parseInt(entry[0]);
-      var count = entry[1];
-      var pct = Math.round((count / maxCount) * 100);
-      var isDanger = dangerPorts.indexOf(port) !== -1;
-      var color = isDanger ? 'var(--red)' : 'var(--blue)';
-      var svcName = portNames[port] || ('TCP/' + port);
-      var exposure = Math.round((count / totalDevices) * 100);
-      return '<div class="port-matrix-row">'
-        + '<div class="port-matrix-label" style="color:' + (isDanger ? 'var(--red)' : 'var(--text)') + '">:' + port + '</div>'
-        + '<div class="port-matrix-svc">' + e(svcName) + '</div>'
-        + '<div class="port-matrix-bar"><div class="port-matrix-fill" data-w="' + pct + '" style="background:' + color + ';width:0%;opacity:0.7"></div></div>'
-        + '<div class="port-matrix-count">' + count + '</div>'
-        + '</div>';
-    }).join('');
-    requestAnimationFrame(function() {
-      el.querySelectorAll('.port-matrix-fill').forEach(function(f) { f.style.width = f.getAttribute('data-w') + '%'; });
-    });
-  }
-
-  /* ── Device Type Chart ── */
-  function renderDeviceTypeChart() {
-    var el = document.getElementById('dtype-chart'); if (!el) return;
-    var counts = {};
-    devices.forEach(function(d) {
-      var t = (d.device_type || 'unknown').toLowerCase();
-      counts[t] = (counts[t] || 0) + 1;
-    });
-    var entries = Object.entries(counts).sort(function(a,b) { return b[1]-a[1]; });
-    var maxCount = entries.length > 0 ? entries[0][1] : 1;
-    el.innerHTML = entries.map(function(entry, i) {
-      var pct = Math.round((entry[1] / maxCount) * 100);
-      var color = VENDOR_COLORS[i % VENDOR_COLORS.length];
-      return '<div class="bar-row">'
-        + '<div class="bar-label" style="width:80px">' + e(entry[0]) + '</div>'
-        + '<div class="bar-track"><div class="bar-fill" data-w="' + pct + '" style="background:' + color + ';width:0%">' + entry[1] + '</div></div>'
-        + '<div class="bar-count">' + entry[1] + '</div>'
-        + '</div>';
-    }).join('');
-    requestAnimationFrame(function() {
-      el.querySelectorAll('.bar-fill').forEach(function(f) { f.style.width = f.getAttribute('data-w') + '%'; });
-    });
-  }
-
-  /* ── MAC Resolution Status ── */
-  function renderMacStatus() {
-    var el = document.getElementById('mac-status'); if (!el) return;
-    var resolved = devices.filter(function(d) { return d.mac_address && d.mac_address !== 'Unknown' && d.mac_address !== ''; }).length;
-    var unresolved = devices.length - resolved;
-    var pct = devices.length > 0 ? Math.round((resolved / devices.length) * 100) : 0;
-    el.innerHTML = '<div style="display:flex; flex-direction:column; gap:8px;">'
-      + '<div style="display:flex; justify-content:space-between; font-family:Roboto Mono,monospace; font-size:11px;">'
-      + '<span style="color:var(--green)">✓ Resolved</span><span style="color:var(--green); font-weight:700;">' + resolved + '</span></div>'
-      + '<div style="display:flex; justify-content:space-between; font-family:Roboto Mono,monospace; font-size:11px;">'
-      + '<span style="color:var(--orange)">✗ Unknown</span><span style="color:var(--orange); font-weight:700;">' + unresolved + '</span></div>'
-      + '<div style="height:8px; background:var(--detail-bg); border-radius:4px; overflow:hidden; border:1px solid var(--border); margin-top:4px;">'
-      + '<div style="height:100%; background:var(--green); width:' + pct + '%; border-radius:4px; transition:width 0.8s;"></div></div>'
-      + '<div style="font-family:Roboto Mono,monospace; font-size:10px; color:var(--dim); text-align:center;">' + pct + '% ARP resolution rate</div>'
-      + '</div>';
-  }
-
-  /* ── Top Risk Endpoints ── */
-  function renderTopRisk() {
-    var el = document.getElementById('top-risk'); if (!el) return;
-    var sorted = devices.slice().sort(function(a,b) { return (b.risk_score||0) - (a.risk_score||0); }).slice(0, 5);
-    el.innerHTML = sorted.map(function(d) {
-      var score = d.risk_score || 0;
-      var color = score >= 80 ? 'var(--red)' : score >= 50 ? 'var(--orange)' : 'var(--blue)';
-      return '<div style="display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid var(--border);">'
-        + '<div style="font-family:Roboto Mono,monospace; font-size:11px; color:var(--text); flex:1;">' + e(d.ip_address) + '</div>'
-        + '<div style="font-family:Roboto Mono,monospace; font-size:10px; color:var(--dim);">' + e((d.vendor||'Unknown').substring(0,8)) + '</div>'
-        + '<div style="font-family:Roboto Mono,monospace; font-size:12px; font-weight:700; color:' + color + '; min-width:28px; text-align:right;">' + score + '</div>'
-        + '</div>';
-    }).join('');
-  }
-
-  /* ── Tooltip ── */
-  function showTooltip(event, text) {
-    var t = document.getElementById('hm-tooltip');
-    t.textContent = text; t.style.display = 'block';
-    t.style.left = (event.clientX + 12) + 'px'; t.style.top = (event.clientY - 10) + 'px';
-  }
-  function hideTooltip() { document.getElementById('hm-tooltip').style.display = 'none'; }
-
-  /* ═══════════════════════════════════════════════════
-     EDR DEVICE TABLE (unchanged logic)
-  ═══════════════════════════════════════════════════ */
-  function renderDevices() {
-    var list = document.getElementById('device-list');
-    if (!devices || devices.length === 0) { list.innerHTML = '<div class="state-msg">No devices found. Run a scan.</div>'; return; }
-    list.innerHTML = devices.map(buildRow).join('');
-    requestAnimationFrame(function() {
-      list.querySelectorAll('.risk-fill').forEach(function(f) { f.style.width = f.getAttribute('data-w') + '%'; });
-    });
-  }
-
-  function buildRow(d) {
-    var id = sid(d.ip_address); var isOpen = expandedIPs.has(d.ip_address);
-    var score = d.risk_score != null ? d.risk_score : 0; var lvl = (d.risk_level || '').toUpperCase();
-    var isIso = d.status === 'mitigated';
-    var rColor = score > 70 ? 'var(--red)' : score > 30 ? 'var(--orange)' : 'var(--green)';
-    var fpColor = (lvl === 'CRITICAL' || lvl === 'HIGH') ? 'var(--red)' : lvl === 'MEDIUM' ? 'var(--orange)' : 'var(--green)';
-
-    var vulnHtml = '<div class="alert-box secure"><div class="sev-row"><span style="color:var(--green)">●</span><span class="sev-text" style="color:var(--green)">SECURE</span></div></div>';
-    var allFindingsHtml = '<li class="finding-item" style="color:var(--dim)">No threat heuristics detected.</li>';
-
-    if (d.vulnerabilities && d.vulnerabilities.length > 0) {
-      var topV = d.vulnerabilities[0]; var isCrit = topV.severity === 'CRITICAL'; var isHigh = topV.severity === 'HIGH';
-      var vClass = isCrit ? 'alert-box crit' : (isHigh ? 'alert-box high' : 'alert-box');
-      var vc = isCrit ? 'var(--red)' : (isHigh ? 'var(--orange)' : 'var(--yellow)');
-      var title = e(topV.cve || topV.type);
-      var kevBadge = topV.in_kev ? '<span style="background:var(--red);color:#fff;padding:2px 4px;border-radius:2px;font-size:8px;">KEV</span>' : '';
-      vulnHtml = '<div class="' + vClass + '">'
-        + '<a href="https://nvd.nist.gov/vuln/detail/' + title + '" target="_blank" class="cve-link" style="color:'+vc+'" onclick="event.stopPropagation();">' + title + ' <div style="display:flex;gap:6px;align-items:center;">'+kevBadge+'<span>↗</span></div></a>'
-        + '<div class="sev-row"><span style="color:' + vc + '">●</span><span class="sev-text" style="color:' + vc + '">' + e(topV.severity) + '</span></div>'
-        + '</div>';
-      allFindingsHtml = d.vulnerabilities.map(function(v) {
-        var remHtml = '';
-        if (v.remediation && v.remediation.length > 0)
-          remHtml = '<ul class="rem-list">' + v.remediation.map(function(r) { return '<li>' + e(r) + '</li>'; }).join('') + '</ul>';
-        return '<li class="finding-item"><div style="width:100%;"><strong style="color:var(--orange)">' + e(v.cve || v.type) + '</strong><br><span style="color:var(--dim);font-size:10px;">' + e(v.description) + '</span>' + remHtml + '</div></li>';
-      }).join('');
+// Stats
+async function loadStats(){
+  try{
+    const s=await api('/stats');
+    document.getElementById('stat-total').textContent=s.total_devices??0;
+    document.getElementById('stat-total-sub').textContent=`subnet · ${document.getElementById('subnet-input').value}`;
+    document.getElementById('stat-critical').textContent=s.critical??0;
+    document.getElementById('stat-critical-sub').textContent=(s.critical||0)>0?'▲ escalated · immediate action':'▼ no critical risks';
+    document.getElementById('stat-vuln').textContent=s.vulnerable??0;
+    document.getElementById('stat-vuln-sub').textContent=`${s.clean??0} clean · ${s.vulnerable??0} at risk`;
+    document.getElementById('stat-isolated').textContent=s.isolated??0;
+    document.getElementById('stat-isolated-sub').textContent=`${s.isolated??0} quarantined`;
+    document.getElementById('footer-endpoints').textContent=s.total_devices??0;
+    document.getElementById('footer-subnet').textContent=document.getElementById('subnet-input').value;
+    if(s.latest_activity&&s.latest_activity!=='N/A'){
+      const d=new Date(s.latest_activity),ago=Math.floor((Date.now()-d.getTime())/1000);
+      const h=Math.floor(ago/3600),m=Math.floor((ago%3600)/60),sec=ago%60;
+      document.getElementById('footer-scan').textContent=`${pad(h)}:${pad(m)}:${pad(sec)} AGO`;
+      document.getElementById('hdr-scan-time').textContent=`LAST SCAN · ${pad(h)}:${pad(m)}:${pad(sec)} AGO`;
     }
-
-    var ports = (d.open_ports || []).map(function(p) { return '<span class="port-pill">:' + e(String(p)) + '</span>'; }).join('') || '<span style="color:var(--dim);font-family:\'Roboto Mono\',monospace;font-size:10px">No open ports</span>';
-    var modelStr = (d.model && d.model !== 'Unknown') ? d.model : 'Unknown Model';
-    var serialStr = d.serial_number || d.serial || 'N/A';
-    var hwHtml = '';
-    if (d.firmware && d.firmware !== 'Unknown') hwHtml += '<div class="hw-tag">FW:<br>' + e(d.firmware) + '</div>';
-    var btnHtml = isIso
-      ? '<button class="quar-btn restore" onclick="event.stopPropagation();doLift(this)" data-ip="' + e(d.ip_address) + '">RESTORE</button>'
-      : '<button class="quar-btn active" onclick="event.stopPropagation();doQuarantine(this)" data-ip="' + e(d.ip_address) + '">⟁ QUARANTINE</button>';
-
-    return '<div class="device-row" id="row-' + id + '">'
-      + '<div class="device-row-main" onclick="toggleRow(this)" data-ip="' + e(d.ip_address) + '" data-sid="' + id + '">'
-        + '<div class="col-endpoint"><span class="chevron' + (isOpen ? ' open' : '') + '" id="chev-' + id + '">›</span><div><div class="ip-addr">' + e(d.ip_address) + '</div><div class="row-hostname">' + e(modelStr) + '</div></div></div>'
-        + '<div class="col-mac"><div class="mac">' + e(d.mac_address || '—') + '</div><div class="oui">' + (d.mac_address && d.mac_address !== 'Unknown' ? 'OUI ' + e(d.mac_address.substring(0,8).toUpperCase()) : 'OUI UNKNOWN') + '</div></div>'
-        + '<div class="col-fp"><span class="fp-dot" style="color:' + fpColor + '">●</span><div style="min-width:0;width:100%;"><div class="fp-vendor">' + e(d.manufacturer || d.vendor || 'UNKNOWN') + '</div><div class="fp-os">' + e(d.os_family || 'Unknown') + '</div>' + hwHtml + '</div></div>'
-        + '<div class="col-vulns">' + vulnHtml + '</div>'
-        + '<div class="col-network">' + ports + '</div>'
-        + '<div class="col-risk"><div class="risk-track"><div class="risk-fill" data-w="' + score + '" style="background:' + rColor + '"></div></div><span class="risk-num" style="color:' + rColor + '">' + score + '</span></div>'
-        + '<div class="col-mit">' + btnHtml + '</div>'
-      + '</div>'
-      + '<div class="device-detail' + (isOpen ? ' open' : '') + '" id="det-' + id + '">'
-        + '<div class="detail-col">'
-          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
-            + '<div class="detail-hdr" style="margin:0;">⊟ Identity & Routing</div>'
-            + '<button class="white-btn" onclick="doWhitelist(this)" data-ip="' + e(d.ip_address) + '">Ignore Device</button>'
-          + '</div>'
-          + '<div class="id-grid">'
-            + '<div class="id-lbl">IP Address</div><div class="id-val">' + e(d.ip_address) + '</div>'
-            + '<div class="id-lbl">MAC Addr</div><div class="id-val">' + e(d.mac_address) + '</div>'
-            + '<div class="id-lbl">Vendor</div><div class="id-val">' + e(d.manufacturer || d.vendor || 'Unknown') + '</div>'
-            + '<div class="id-lbl">Model</div><div class="id-val">' + e(modelStr) + '</div>'
-            + '<div class="id-lbl">OS Family</div><div class="id-val">' + e(d.os_family || 'Unknown') + '</div>'
-            + '<div class="id-lbl">Hostname</div><div class="id-val">' + e(d.hostname || 'Unknown') + '</div>'
-            + '<div class="id-lbl">Serial</div><div class="id-val">' + e(serialStr) + '</div>'
-            + '<div class="id-lbl">Discovery</div><div class="id-val">' + e(d.scan_method || 'Go Sensor') + '</div>'
-          + '</div>'
-        + '</div>'
-        + '<div class="detail-col"><div class="detail-hdr">⌖ Threat Forensics & Remediation</div><ul class="finding-list">' + allFindingsHtml + '</ul></div>'
-        + '<div class="detail-col"><div class="detail-hdr-row"><span class="detail-hdr" style="margin:0;">◎ AI Analyst Console</span><button class="audit-run-btn" onclick="doAudit(this)" data-ip="' + e(d.ip_address) + '" data-sid="' + id + '">✦ Initialize</button></div><textarea class="audit-out" id="audit-' + id + '" readonly placeholder="Awaiting analyst initialization...">' + e(auditCache[d.ip_address] || '') + '</textarea></div>'
-      + '</div>'
-    + '</div>';
-  }
-
-  function toggleRow(el) {
-    var ip = el.getAttribute('data-ip'); var id = el.getAttribute('data-sid');
-    var det = document.getElementById('det-' + id); var chev = document.getElementById('chev-' + id);
-    if (!det || !chev) return;
-    if (expandedIPs.has(ip)) { expandedIPs.delete(ip); det.classList.remove('open'); chev.classList.remove('open'); }
-    else { expandedIPs.add(ip); det.classList.add('open'); chev.classList.add('open'); }
-  }
-
-  function renderEvents() {
-    var sidebar = document.getElementById('event-list'); var miniEl = document.getElementById('mini-events');
-    var displayed = events.slice(0, 100);
-    sidebar.innerHTML = displayed.map(function(ev) {
-      var tClass = (ev.severity === 'CRITICAL' || ev.severity === 'HIGH') ? 'ev-type warn' : 'ev-type info';
-      return '<div class="ev-entry"><div class="ev-line1"><span class="ev-ts">' + e(fmtTs(ev.timestamp)) + '</span><span class="' + tClass + '">' + e(ev.event_type || 'EVENT') + '</span></div><div class="ev-line2"><strong style="color:var(--text)">' + e(ev.ip_address || '') + '</strong> ' + e(ev.description || '') + '</div></div>';
-    }).join('');
-    if (displayed.length === 0) miniEl.innerHTML = '<div class="mini-ev" style="color:var(--dim)">Awaiting telemetry...</div>';
-    else miniEl.innerHTML = displayed.slice(0,2).map(function(ev) {
-      return '<div class="mini-ev"><span style="color:var(--blue)">' + e(fmtTs(ev.timestamp)) + '</span> <span style="color:var(--text)">' + e(ev.ip_address || '') + '</span> ' + e(ev.description || '') + '</div>';
-    }).join('');
-  }
-
-  function fmtTs(ts) { try { return new Date(ts).toLocaleTimeString('en-US', {hour12: false}); } catch(err) { return String(ts); } }
-  function e(str) { return str == null ? '' : String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-  function sid(ip) { return String(ip).replace(/[^a-zA-Z0-9]/g,'_'); }
-
-  function triggerScan() {
-    var btn = document.getElementById('scan-btn');
-    if (btn) { btn.disabled = true; btn.innerHTML = '⟳ INITIALIZING...'; btn.style.backgroundSize = '5% 100%'; }
-    fetch(API + '/scan/trigger', {
-      method: 'POST', headers: {'Content-Type': 'application/json', 'X-API-Key': API_KEY},
-      body: JSON.stringify({subnet: document.getElementById('subnet-input').value.trim()})
-    }).then(startScanPoll);
-  }
-
-  function startScanPoll() { scanning = true; if (!scanTimer) scanTimer = setInterval(pollScan, 2000); }
-
-  function pollScan() {
-    fetch(API + '/scan/status', {headers: {'X-API-Key': API_KEY}})
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (!d.scanning) {
-          scanning = false; clearInterval(scanTimer); scanTimer = null;
-          var btn = document.getElementById('scan-btn');
-          if (btn) { btn.disabled = false; btn.innerHTML = '&#x27F2; SCAN NOW'; btn.style.backgroundSize = '0% 100%'; }
-          fetchAll();
-        }
-      });
-  }
-
-  function doQuarantine(btn) { fetch(API + '/agent/isolate/' + btn.getAttribute('data-ip'), {method:'POST', headers:{'Content-Type':'application/json','X-API-Key':API_KEY}}).then(fetchAll); }
-  function doLift(btn) { fetch(API + '/agent/lift/' + btn.getAttribute('data-ip'), {method:'POST', headers:{'Content-Type':'application/json','X-API-Key':API_KEY}}).then(fetchAll); }
-
-  function doWhitelist(btn) {
-    if (confirm("Permanently ignore this device in future scans?")) {
-      fetch(API + '/agent/whitelist/' + btn.getAttribute('data-ip'), {method:'POST', headers:{'Content-Type':'application/json','X-API-Key':API_KEY}})
-        .then(function() { alert("Device added to ignore list."); fetchAll(); });
+    if(s.scanning){
+      document.getElementById('hdr-scanning').style.display='';
+      document.getElementById('scan-btn').disabled=true;
+      document.getElementById('scan-btn').innerHTML='<i class="fas fa-circle-notch fa-spin" style="margin-right:5px;font-size:9px;"></i>SCANNING...';
+    }else{
+      document.getElementById('hdr-scanning').style.display='none';
+      document.getElementById('scan-btn').disabled=false;
+      document.getElementById('scan-btn').innerHTML='<i class="fas fa-crosshairs" style="margin-right:5px;font-size:9px;"></i>Scan Now';
     }
-  }
+  }catch(e){if(e.message!=='401')console.error('stats:',e);}
+}
 
-  function doAudit(btn) {
-    var ip = btn.getAttribute('data-ip'); var id = btn.getAttribute('data-sid');
-    var ta = document.getElementById('audit-' + id); if (!ta) return;
-    ta.value = 'Initializing AI Analysis...\n';
-    fetch(API + '/ai/audit', {method:'POST', headers:{'Content-Type':'application/json','X-API-Key':API_KEY}, body: JSON.stringify({ip_address: ip})})
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        var txt = data.findings ? JSON.stringify(data.findings, null, 2) : (data.error || 'Done.');
-        var el = document.getElementById('audit-' + id); if (el) el.value = txt; auditCache[ip] = txt;
-      }).catch(function() { var el = document.getElementById('audit-' + id); if (el) el.value = 'Failed to connect to AI engine.'; });
-  }
+// Devices
+async function loadDevices(){
+  try{
+    devices=await api('/devices');
+    renderDevices(devices); renderAnalytics();
+    const crits=devices.filter(d=>(d.vulnerabilities||[]).some(v=>v.severity==='CRITICAL')).length;
+    document.getElementById('hdr-alive').textContent=`${devices.length} / ${devices.length} ALIVE`;
+    document.getElementById('hdr-critical').textContent=`${crits} CRITICAL`;
+    updateActLog(devices);
+  }catch(e){if(e.message!=='401')console.error('devices:',e);}
+}
 
-  function prependNetworkRow(listId, html, maxRows) {
-    var list = document.getElementById(listId); if (!list) return;
-    var placeholder = list.querySelector('.state-msg'); if (placeholder) placeholder.remove();
-    list.insertAdjacentHTML('afterbegin', html);
-    while (list.children.length > maxRows) list.removeChild(list.lastElementChild);
-  }
+function rc(level){
+  if(!level)return{t:'risk-low',f:'fill-low',l:'UNKNOWN'};
+  const l=level.toUpperCase();
+  if(l==='CRITICAL')return{t:'risk-crit',f:'fill-crit',l:'CRITICAL'};
+  if(l==='HIGH')return{t:'risk-high',f:'fill-high',l:'HIGH'};
+  if(l==='MEDIUM')return{t:'risk-med',f:'fill-med',l:'MEDIUM'};
+  return{t:'risk-low',f:'fill-low',l:'LOW'};
+}
+function sc(s){if(!s)return'med';const u=s.toUpperCase();return u==='CRITICAL'?'crit':u==='HIGH'?'high':'med';}
 
-  function renderFlowRow(message) {
-    var src = e(message.src || message.source || message.src_ip || 'unknown');
-    var dst = e(message.dst || message.destination || message.dst_ip || 'unknown');
-    var proto = e(message.proto || message.protocol || 'unknown');
-    var ts = e(new Date().toLocaleTimeString('en-US', {hour12: false}));
-    prependNetworkRow('flow-list', '<div class="network-row"><div class="flow-main">' + src + ' → ' + dst + '</div><div class="flow-meta">PROTO: ' + proto.toUpperCase() + ' · ' + ts + '</div></div>', 50);
-  }
+function renderDevices(devs){
+  const tbody=document.getElementById('device-tbody');
+  if(!devs||devs.length===0){tbody.innerHTML='<tr><td colspan="7" class="empty-state">NO DEVICES — RUN A SCAN</td></tr>';return;}
+  const sorted=[...devs].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0));
+  tbody.innerHTML=sorted.map(d=>{
+    const r=rc(d.risk_level),score=d.risk_score||0;
+    const iso=d.status==='mitigated'||d.status==='isolated';
+    const rowBg=d.risk_level==='CRITICAL'?'background:rgba(248,81,73,0.04);':d.risk_level==='HIGH'?'background:rgba(210,153,34,0.04);':'';
+    const vulns=(d.vulnerabilities||[]).slice(0,3);
+    const cveHtml=vulns.length===0?'<span class="no-vuln">✓ CLEAN</span>':vulns.map(v=>`<span class="cve-badge ${sc(v.severity)}">${esc(v.cve||v.type||'VULN')}</span>`).join('');
+    const ports=(d.open_ports||[]).slice(0,5).map(p=>`<span class="port-pill">:${p}</span>`).join('');
+    const vendor=d.vendor||d.manufacturer||'Unknown';
+    const hostname=d.hostname&&d.hostname!=='Unknown'?d.hostname:d.model&&d.model!=='Unknown'?d.model:'';
+    const fw=d.firmware&&d.firmware!=='Unknown'?`<span style="color:var(--blue);font-size:9px;">FW: ${esc(d.firmware.substring(0,26))}</span>`:'';
+    return `<tr style="${rowBg}">
+      <td><span class="endpoint-ip">${esc(d.ip_address)}</span><span class="endpoint-name">${esc(hostname||vendor)}</span></td>
+      <td><span class="mac-addr">${esc(d.mac_address||'—')}</span><span class="oui-vendor">${esc(vendor.toUpperCase().substring(0,14))}</span></td>
+      <td><span style="font-size:10px;color:var(--dim);">${esc(d.os_family||'Embedded Linux')}<br>${fw}</span></td>
+      <td><div class="cve-badges">${cveHtml}</div></td>
+      <td><span class="state-badge ${iso?'state-isolated':'state-online'}">${iso?'ISOLATED':'ONLINE'}</span><div class="port-pills" style="margin-top:4px;">${ports}</div></td>
+      <td class="risk-cell"><div class="risk-score-row"><span class="risk-number ${r.t}">${score}</span><div class="risk-bar-track"><div class="risk-bar-fill ${r.f}" style="width:${score}%;"></div></div></div><span class="risk-label ${r.t}">${r.l}</span></td>
+      <td><div class="controls-cell">
+        <button class="btn-quar ${iso?'active':''}" data-ip="${esc(d.ip_address)}" data-iso="${iso}" onclick="toggleQuar(this)">${iso?'Quarantined':'Quarantine'}</button>
+        <button class="btn-insp" onclick='openInspect(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Inspect</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
 
-  function renderAnomalyRow(anomaly) {
-    var text = e(typeof anomaly === 'string' ? anomaly : JSON.stringify(anomaly));
-    var lowered = text.toLowerCase();
-    var isCritical = lowered.includes('554') || lowered.includes('critical') || lowered.includes('insecure');
-    prependNetworkRow('anomaly-list', '<div class="network-row anomaly-row' + (isCritical ? ' critical' : '') + '">' + text + '</div>', 50);
-  }
+function updateActLog(devs){
+  const crit=devs.filter(d=>(d.vulnerabilities||[]).some(v=>v.severity==='CRITICAL'));
+  const t=istNow(),ts=`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+  const lines=[];
+  if(crit.length>0)lines.push(`<div class="activity-line"><span class="ts">${ts}</span><span class="crit">[CRIT]</span> ${crit.length} critical device${crit.length>1?'s':''}</div>`);
+  const iso=devs.filter(d=>d.status==='mitigated'||d.status==='isolated');
+  if(iso.length>0)lines.push(`<div class="activity-line"><span class="ts">${ts}</span><span class="warn">[WARN]</span> ${iso.length} quarantined</div>`);
+  if(lines.length===0)lines.push(`<div class="activity-line"><span class="ts">${ts}</span><span class="ok">[OK]</span> ${devs.length} endpoints nominal</div>`);
+  document.getElementById('activity-log').innerHTML=lines.slice(0,3).join('');
+}
 
-  function initWebSocket() {
-    var protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    var ws = new WebSocket(protocol + window.location.host + '/ws/events');
-    ws.onopen = function() {
-      document.getElementById('mini-events').innerHTML = '<div class="mini-ev" style="color:var(--green)">Live telemetry stream active...</div>';
+// Quarantine
+async function toggleQuar(btn){
+  const ip=btn.dataset.ip,iso=btn.dataset.iso==='true';
+  btn.disabled=true;
+  try{
+    if(iso){await api(`/agent/lift/${ip}`,{method:'POST'});btn.textContent='Quarantine';btn.classList.remove('active');btn.dataset.iso='false';}
+    else{await api(`/agent/isolate/${ip}`,{method:'POST'});btn.textContent='Quarantined';btn.classList.add('active');btn.dataset.iso='true';}
+    setTimeout(loadDevices,1500);
+  }catch(e){if(e.message!=='401')console.error(e);}
+  finally{btn.disabled=false;}
+}
+
+// Events
+async function loadEvents(){
+  try{
+    const events=await api('/events');
+    const stream=document.getElementById('event-stream');
+    if(!events||events.length===0){stream.innerHTML='<div class="sidebar-divider"><span class="divider-label">no events recorded</span></div>';return;}
+    stream.innerHTML=events.slice(0,40).map(ev=>{
+      const ts=fmtIst(ev.timestamp);
+      const cls=ev.severity==='CRITICAL'?'etype-crit':ev.severity==='HIGH'?'etype-warn':ev.severity==='LOW'?'etype-ok':'etype-info';
+      return `<div class="event-entry"><div class="event-meta"><span class="event-ts">${ts}</span><span class="event-type ${cls}">${esc(ev.event_type||'EVENT')}</span><span class="event-src">${esc(ev.ip_address||'SIN')}</span></div><div class="event-msg">${esc(ev.description||'—')}</div></div>`;
+    }).join('')+'<div class="sidebar-divider"><span class="divider-label">session history</span></div>';
+  }catch(e){if(e.message!=='401')console.error(e);}
+}
+
+// WebSocket
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  try{
+    ws=new WebSocket(`${proto}://${location.host}${WS}`);
+    ws.onopen=()=>{
+      const b=document.getElementById('ws-badge');
+      b.style.color='var(--green)';b.style.borderColor='var(--green-border)';b.style.background='var(--green-bg)';
+      b.innerHTML='<span class="scanning">● LIVE</span>';
+      document.getElementById('footer-dot').className='status-dot status-ok';
+      document.getElementById('footer-status-text').textContent='ALL SYSTEMS NOMINAL';
     };
-    ws.onmessage = function(event) {
-      var data = JSON.parse(event.data);
-      var btn = document.getElementById('scan-btn');
-      if (data.type === "SCAN_START") {
-        if (btn) { btn.disabled = true; btn.innerHTML = '⟳ DISCOVERING...'; btn.style.backgroundSize = '10% 100%'; }
-      } else if (data.type === "SCAN_PROGRESS") {
-        var prog = JSON.parse(data.message);
-        var pct = prog.total > 0 ? Math.round((prog.current / prog.total) * 100) : 100;
-        if (btn) { btn.innerHTML = 'AUDITING ' + prog.current + '/' + prog.total; btn.style.backgroundSize = Math.max(10, pct) + '% 100%'; }
-      } else if (data.type === "SCAN_COMPLETE") {
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#x27F2; SCAN NOW'; btn.style.backgroundSize = '0% 100%'; }
-        fetchAll();
-      } else if (data.type === "MITIGATION" || data.type === "DRIFT") {
-        fetchAll();
-      } else if (data.type === "FLOW_NEW") {
-        var msg = data.message || {};
-        renderFlowRow(msg);
-        if (msg.anomaly) renderAnomalyRow(msg.anomaly);
-      } else if (data.type === "TRAFFIC_ALERT") {
-        var alertMsg = data.message || {};
-        if (alertMsg.anomaly) renderAnomalyRow(alertMsg.anomaly); else renderAnomalyRow(alertMsg);
-      }
-    };
-    ws.onclose = function() { setTimeout(initWebSocket, 5000); };
-  }
+    ws.onmessage=e=>{try{handleWS(JSON.parse(e.data));}catch(err){}};
+    ws.onclose=()=>setTimeout(connectWS,4000);
+    ws.onerror=()=>ws.close();
+  }catch(e){setTimeout(connectWS,5000);}
+}
 
-  fetchAll();
-  initWebSocket();
+function handleWS(ev){
+  const type=ev.type||'EVENT';
+  prependEvent(ev);
+  if(type==='SCAN_COMPLETE'||type==='MITIGATION'||type==='DRIFT'){loadDevices();loadStats();}
+  else if(type==='SCAN_START'){
+    document.getElementById('scan-btn').disabled=true;
+    document.getElementById('scan-btn').innerHTML='<i class="fas fa-circle-notch fa-spin" style="margin-right:5px;font-size:9px;"></i>SCANNING...';
+    document.getElementById('hdr-scanning').style.display='';
+  }
+  else if(type==='FLOW_NEW'){
+    const msg=typeof ev.message==='string'?tryParse(ev.message):ev.message||{};
+    if(document.getElementById('tab-network').classList.contains('active'))renderFlow(msg);
+    else{flowBuf.push(msg);if(flowBuf.length>100)flowBuf.shift();}
+  }
+  else if(type==='TRAFFIC_ALERT'){
+    const a=typeof ev.message==='string'?tryParse(ev.message):ev.message||{};
+    const txt=a.anomaly||JSON.stringify(a);
+    if(document.getElementById('tab-network').classList.contains('active'))renderAnomaly(txt);
+    else{anomalyBuf.push(txt);if(anomalyBuf.length>100)anomalyBuf.shift();}
+  }
+}
+
+function tryParse(s){try{return JSON.parse(s);}catch(e){return{};}}
+
+function prependEvent(ev){
+  const stream=document.getElementById('event-stream');
+  const t=istNow(),ts=`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+  const type=ev.type||ev.event_type||'EVENT';
+  const cls=type.includes('ALERT')||type.includes('CRIT')?'etype-crit':type.includes('WARN')?'etype-warn':type.includes('OK')||type.includes('MITIG')?'etype-ok':'etype-info';
+  const msg=ev.message||ev.description||'';
+  const display=typeof msg==='object'?JSON.stringify(msg).substring(0,80):String(msg).substring(0,80);
+  const el=document.createElement('div');el.className='event-entry';el.style.opacity='0';el.style.transition='opacity 0.3s';
+  el.innerHTML=`<div class="event-meta"><span class="event-ts">${ts}</span><span class="event-type ${cls}">${type}</span><span class="event-src">${esc(ev.ip_address||ev.source||'SIN')}</span></div><div class="event-msg">${esc(display)}</div>`;
+  stream.insertBefore(el,stream.firstChild);
+  requestAnimationFrame(()=>{el.style.opacity='1';});
+  while(stream.children.length>60)stream.removeChild(stream.lastChild);
+  // activity log
+  const log=document.getElementById('activity-log');
+  const c2=type.includes('CRIT')?'crit':type.includes('WARN')?'warn':'ok';
+  const line=document.createElement('div');line.className='activity-line';
+  line.innerHTML=`<span class="ts">${ts}</span><span class="${c2}">[${type.substring(0,4)}]</span> ${esc(display.substring(0,42))}`;
+  log.insertBefore(line,log.firstChild);
+  while(log.children.length>3)log.removeChild(log.lastChild);
+}
+
+// Network Analyzer
+function renderFlow(msg){
+  const list=document.getElementById('flow-list');
+  const ph=list.querySelector('.empty-state');if(ph)ph.remove();
+  const t=istNow(),ts=`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+  const row=document.createElement('div');row.className='net-row';
+  row.innerHTML=`<div class="flow-main">${esc(msg.src||'?')} → ${esc(msg.dst||'?')}</div><div class="flow-meta">PROTO: ${esc((msg.proto||'TCP').toUpperCase())} · ${ts} IST</div>`;
+  list.insertBefore(row,list.firstChild);
+  while(list.children.length>50)list.removeChild(list.lastChild);
+}
+function renderAnomaly(text){
+  const list=document.getElementById('anomaly-list');
+  const ph=list.querySelector('.empty-state');if(ph)ph.remove();
+  const low=text.toLowerCase();
+  const isCrit=low.includes('rtsp')||low.includes('554')||low.includes('telnet')||low.includes('critical');
+  const row=document.createElement('div');row.className=`net-row anomaly-row${isCrit?' critical':''}`;
+  row.textContent=text;
+  list.insertBefore(row,list.firstChild);
+  while(list.children.length>50)list.removeChild(list.lastChild);
+}
+
+// Scan
+document.getElementById('scan-btn').addEventListener('click',async function(){
+  if(this.disabled)return;
+  const raw=document.getElementById('subnet-input').value.trim();
+  const subnet=raw.replace(/\/\d+$/,'').replace(/\.\d+$/,'');
+  this.disabled=true;this.innerHTML='<i class="fas fa-circle-notch fa-spin" style="margin-right:5px;font-size:9px;"></i>SCANNING...';
+  try{
+    await api('/scan/trigger',{method:'POST',body:JSON.stringify({subnet})});
+    document.getElementById('hdr-scanning').style.display='';
+    if(scanPoll)clearInterval(scanPoll);
+    scanPoll=setInterval(async()=>{const s=await api('/scan/status');if(!s.scanning){clearInterval(scanPoll);await loadStats();await loadDevices();}},5000);
+  }catch(e){if(e.message!=='401'){this.disabled=false;this.innerHTML='<i class="fas fa-crosshairs" style="margin-right:5px;font-size:9px;"></i>Scan Now';}}
+});
+
+// Nav Tabs
+document.querySelectorAll('.nav-tab').forEach(tab=>{
+  tab.addEventListener('click',function(){
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-'+this.dataset.tab).classList.add('active');
+    const id=this.dataset.tab;
+    if(id==='analytics')renderAnalytics();
+    if(id==='network'){flowBuf.forEach(m=>renderFlow(m));flowBuf=[];anomalyBuf.forEach(t=>renderAnomaly(t));anomalyBuf=[];}
+    if(id==='threats')loadThreats();
+    if(id==='incidents')loadIncidents();
+    if(id==='policies')loadPolicies();
+  });
+});
+
+// SOC Analytics
+function renderAnalytics(){
+  if(!devices||devices.length===0)return;
+  renderHeatmap();renderRiskDist();renderVendorDonut();
+  renderFwChart();renderPortMatrix();renderDtypeChart();
+  renderMacStatus();renderTopRisk();
+}
+
+function renderHeatmap(){
+  const g=document.getElementById('heatmap-grid');if(!g)return;
+  document.getElementById('hm-badge').textContent=devices.length+' endpoints';
+  g.innerHTML=devices.map(d=>{
+    const s=d.risk_score||0;
+    const cls=s>=80?'hm-crit':s>=50?'hm-high':s>=25?'hm-med':s>0?'hm-low':'hm-none';
+    const oct=(d.ip_address||'').split('.').pop();
+    return `<div class="hm-cell ${cls}" onmouseenter="showTip(event,'${esc(d.ip_address)} — ${esc(d.vendor||'Unknown')} — ${s}')" onmouseleave="hideTip()">${oct}</div>`;
+  }).join('');
+}
+
+function renderRiskDist(){
+  const el=document.getElementById('risk-dist');if(!el)return;
+  const c={CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+  devices.forEach(d=>{const l=(d.risk_level||'LOW').toUpperCase();if(c[l]!==undefined)c[l]++;else c.LOW++;});
+  const total=devices.length||1;
+  document.getElementById('rd-badge').textContent=total+' devices';
+  const rows=[{l:'CRITICAL',c:c.CRITICAL,col:'var(--red)'},{l:'HIGH',c:c.HIGH,col:'var(--orange)'},{l:'MEDIUM',c:c.MEDIUM,col:'var(--blue)'},{l:'LOW',c:c.LOW,col:'var(--green)'}];
+  el.innerHTML=rows.map(r=>{
+    const pct=Math.round((r.c/total)*100);
+    return `<div class="rdist-row"><div class="rdist-lbl" style="color:${r.col}">${r.l}</div><div class="rdist-bar"><div class="rdist-fill" data-w="${pct}" style="background:${r.col};width:0%">${r.c>0?r.c:''}</div></div><div class="rdist-cnt" style="color:${r.col}">${r.c}</div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>el.querySelectorAll('.rdist-fill').forEach(f=>{f.style.width=f.getAttribute('data-w')+'%';}));
+}
+
+function renderVendorDonut(){
+  const wrap=document.getElementById('donut-wrap');if(!wrap)return;
+  const counts={};
+  devices.forEach(d=>{const v=(d.vendor||d.manufacturer||'Unknown').toUpperCase();counts[v]=(counts[v]||0)+1;});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const total=devices.length||1;
+  document.getElementById('vendor-badge').textContent=entries.length+' vendor'+(entries.length!==1?'s':'');
+  const size=100,cx=50,cy=50,r=38,ir=20;
+  let sl='',offset=0;
+  entries.forEach((e,i)=>{
+    const pct=e[1]/total,angle=pct*2*Math.PI;
+    const x1=cx+r*Math.sin(offset),y1=cy-r*Math.cos(offset);
+    offset+=angle;
+    const x2=cx+r*Math.sin(offset),y2=cy-r*Math.cos(offset);
+    const la=angle>Math.PI?1:0,col=VC[i%VC.length];
+    sl+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${la},1 ${x2},${y2} Z" fill="${col}" opacity="0.85"/>`;
+  });
+  sl+=`<circle cx="${cx}" cy="${cy}" r="${ir}" fill="var(--panel)"/>`;
+  sl+=`<text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Roboto Mono,monospace" font-size="11" font-weight="700" fill="var(--text)">${total}</text>`;
+  const leg=entries.slice(0,6).map((e,i)=>{
+    const col=VC[i%VC.length],pct=Math.round((e[1]/total)*100);
+    return `<div class="donut-row"><div class="donut-dot" style="background:${col}"></div><div class="donut-name">${esc(e[0])}</div><div class="donut-val">${e[1]} (${pct}%)</div></div>`;
+  }).join('');
+  wrap.innerHTML=`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0;">${sl}</svg><div class="donut-leg">${leg}</div>`;
+}
+
+function renderFwChart(){
+  const el=document.getElementById('fw-chart');if(!el)return;
+  const counts={};
+  devices.forEach(d=>{let fw=d.firmware||'Unknown';if(fw.length>32)fw=fw.substring(0,32)+'…';counts[fw]=(counts[fw]||0)+1;});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const maxC=entries.length>0?entries[0][1]:1;
+  document.getElementById('fw-badge').textContent=entries.length+' version'+(entries.length!==1?'s':'');
+  el.innerHTML=entries.map((e,i)=>{
+    const pct=Math.round((e[1]/maxC)*100),col=e[0]==='Unknown'?'var(--dim)':VC[i%VC.length];
+    return `<div class="bar-row"><div class="bar-lbl" title="${esc(e[0])}">${esc(e[0])}</div><div class="bar-track"><div class="bar-fill" data-w="${pct}" style="background:${col};width:0%">${pct>15?e[1]:''}</div></div><div class="bar-cnt">${e[1]}</div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>el.querySelectorAll('.bar-fill').forEach(f=>{f.style.width=f.getAttribute('data-w')+'%';}));
+}
+
+function renderPortMatrix(){
+  const el=document.getElementById('port-matrix');if(!el)return;
+  const pn={554:'RTSP',34567:'DVR-Web',80:'HTTP',443:'HTTPS',8000:'Hikvision',8080:'HTTP-Alt',22:'SSH',23:'Telnet',21:'FTP',1883:'MQTT',37777:'Dahua-SDK'};
+  const pc={};
+  devices.forEach(d=>{(d.open_ports||[]).forEach(p=>{pc[p]=(pc[p]||0)+1;});});
+  const entries=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxC=entries.length>0?entries[0][1]:1;
+  const dp=[554,23,21,8000,34567,37777];
+  document.getElementById('port-badge').textContent=entries.length+' exposed ports';
+  el.innerHTML=entries.map(e=>{
+    const port=parseInt(e[0]),count=e[1],pct=Math.round((count/maxC)*100);
+    const isDanger=dp.includes(port),col=isDanger?'var(--red)':'var(--blue)';
+    return `<div class="pm-row"><div class="pm-label" style="color:${isDanger?'var(--red)':'var(--text)'}">:${port}</div><div class="pm-svc">${esc(pn[port]||'TCP/'+port)}</div><div class="pm-bar"><div class="pm-fill" data-w="${pct}" style="background:${col};width:0%"></div></div><div class="pm-cnt">${count}</div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>el.querySelectorAll('.pm-fill').forEach(f=>{f.style.width=f.getAttribute('data-w')+'%';}));
+}
+
+function renderDtypeChart(){
+  const el=document.getElementById('dtype-chart');if(!el)return;
+  const counts={};
+  devices.forEach(d=>{const t=(d.device_type||'unknown').toLowerCase();counts[t]=(counts[t]||0)+1;});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const maxC=entries.length>0?entries[0][1]:1;
+  el.innerHTML=entries.map((e,i)=>{
+    const pct=Math.round((e[1]/maxC)*100),col=VC[i%VC.length];
+    return `<div class="bar-row"><div class="bar-lbl" style="width:80px">${esc(e[0])}</div><div class="bar-track"><div class="bar-fill" data-w="${pct}" style="background:${col};width:0%">${e[1]}</div></div><div class="bar-cnt">${e[1]}</div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>el.querySelectorAll('.bar-fill').forEach(f=>{f.style.width=f.getAttribute('data-w')+'%';}));
+}
+
+function renderMacStatus(){
+  const el=document.getElementById('mac-status');if(!el)return;
+  const res=devices.filter(d=>d.mac_address&&d.mac_address!=='Unknown'&&d.mac_address!=='').length;
+  const unres=devices.length-res,pct=devices.length>0?Math.round((res/devices.length)*100):0;
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--green)">✓ Resolved</span><span style="color:var(--green);font-weight:700;">${res}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--orange)">✗ Unknown</span><span style="color:var(--orange);font-weight:700;">${unres}</span></div>
+    <div style="height:7px;background:var(--detail-bg);border:1px solid var(--border);overflow:hidden;margin-top:4px;"><div style="height:100%;background:var(--green);width:${pct}%;transition:width 0.8s;"></div></div>
+    <div style="font-size:9px;color:var(--dim);text-align:center;">${pct}% ARP resolution rate</div>
+  </div>`;
+}
+
+function renderTopRisk(){
+  const el=document.getElementById('top-risk');if(!el)return;
+  const sorted=[...devices].sort((a,b)=>(b.risk_score||0)-(a.risk_score||0)).slice(0,5);
+  el.innerHTML=sorted.map(d=>{
+    const s=d.risk_score||0,col=s>=80?'var(--red)':s>=50?'var(--orange)':'var(--blue)';
+    return `<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:11px;flex:1;">${esc(d.ip_address)}</div>
+      <div style="font-size:10px;color:var(--dim);">${esc((d.vendor||'Unknown').substring(0,8))}</div>
+      <div style="font-size:12px;font-weight:700;color:${col};min-width:26px;text-align:right;">${s}</div>
+    </div>`;
+  }).join('');
+}
+
+function showTip(e,t){const tip=document.getElementById('hm-tooltip');tip.textContent=t;tip.style.display='block';tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';}
+function hideTip(){document.getElementById('hm-tooltip').style.display='none';}
+
+// Threats
+async function loadThreats(){
+  try{
+    const threats=await api('/threats');
+    const grid=document.getElementById('threat-grid');
+    if(!threats||threats.length===0){grid.innerHTML='<div class="empty-state">NO THREATS DETECTED</div>';return;}
+    grid.innerHTML=threats.map(t=>{
+      const ss=t.severity==='CRITICAL'?`color:var(--red);border-color:var(--red-border);background:var(--red-bg);`:t.severity==='HIGH'?`color:var(--orange);border-color:var(--orange-border);background:var(--orange-bg);`:`color:var(--blue);border-color:rgba(88,166,255,0.35);background:var(--blue-bg);`;
+      return `<div class="threat-card sev-${esc(t.severity)}"><div class="threat-head"><span class="threat-id">${esc(t.id)}</span><span class="threat-sev" style="${ss}">${esc(t.severity)}</span></div><div class="threat-desc">${esc(t.description||'No description.')}</div><div class="threat-ep"><i class="fas fa-network-wired" style="margin-right:4px;font-size:8px;"></i>${t.affected_endpoints} affected endpoint${t.affected_endpoints!==1?'s':''}</div></div>`;
+    }).join('');
+  }catch(e){if(e.message!=='401')console.error(e);}
+}
+
+// Incidents
+async function loadIncidents(){
+  try{
+    const events=await api('/events');
+    const tbody=document.getElementById('incident-tbody');
+    if(!events||events.length===0){tbody.innerHTML='<tr><td colspan="5" class="empty-state">NO INCIDENTS</td></tr>';return;}
+    tbody.innerHTML=events.map(ev=>{
+      const ts=fmtIst(ev.timestamp);
+      const ss=ev.severity==='CRITICAL'?'color:var(--red)':ev.severity==='HIGH'?'color:var(--orange)':'color:var(--blue)';
+      return `<tr><td style="color:var(--blue);white-space:nowrap;">${ts}</td><td>${esc(ev.ip_address||'—')}</td><td style="color:var(--dim);">${esc(ev.event_type||'—')}</td><td style="${ss};font-weight:600;">${esc(ev.severity||'INFO')}</td><td style="white-space:normal;max-width:340px;color:var(--dim);">${esc(ev.description||'—')}</td></tr>`;
+    }).join('');
+  }catch(e){if(e.message!=='401')console.error(e);}
+}
+
+// Policies
+const PL={auto_quarantine_critical:{name:'Auto-Quarantine Critical Devices',desc:'Automatically isolate devices with critical severity vulnerabilities'},strict_whitelist_mode:{name:'Strict Whitelist Mode',desc:'Block all unknown devices from network access'},network_discovery_enabled:{name:'Network Discovery',desc:'Allow SIN engine to run subnet discovery scans'}};
+async function loadPolicies(){
+  try{
+    const p=await api('/policies');
+    const list=document.getElementById('policy-list');
+    const keys=Object.keys(p);
+    document.getElementById('policy-status').textContent=`${keys.filter(k=>p[k]).length} / ${keys.length} ACTIVE`;
+    list.innerHTML=keys.map(k=>{
+      const info=PL[k]||{name:k,desc:''};
+      return `<div class="policy-row"><div><div class="policy-name">${esc(info.name)}</div><div class="policy-desc">${esc(info.desc)}</div></div><label class="toggle"><input type="checkbox" ${p[k]?'checked':''} onchange="setPolicy('${k}',this.checked)"><span class="toggle-slider"></span></label></div>`;
+    }).join('');
+  }catch(e){if(e.message!=='401')console.error(e);}
+}
+async function setPolicy(name,value){try{await api(`/policies/${name}`,{method:'POST',body:JSON.stringify({value})});setTimeout(loadPolicies,800);}catch(e){if(e.message!=='401')console.error(e);}}
+
+// Inspect
+function openInspect(device){
+  const body=document.getElementById('inspect-body');
+  const vulns=device.vulnerabilities||[];
+  const ports=(device.open_ports||[]).map(p=>`<span class="port-pill">:${p}</span>`).join('');
+  const vhtml=vulns.length===0?'<div style="color:var(--green);font-size:10px;">✓ NO KNOWN VULNERABILITIES</div>':vulns.map(v=>`<div class="inspect-vuln ${esc(v.severity||'LOW')}"><div class="vuln-head"><span class="vuln-cve">${esc(v.cve||v.type||'Vulnerability')}</span><span class="cve-badge ${sc(v.severity)}">${esc(v.severity||'?')}</span></div><div class="vuln-desc">${esc(v.description||'')}</div>${(v.remediation||[]).length?`<div style="margin-top:5px;font-size:9px;color:var(--green);">▸ ${v.remediation.map(r=>esc(r)).join('<br>▸ ')}</div>`:''}</div>`).join('');
+  body.innerHTML=`<div class="inspect-grid">
+    <div class="inspect-field"><label>IP Address</label><value>${esc(device.ip_address)}</value></div>
+    <div class="inspect-field"><label>Hostname</label><value>${esc(device.hostname||'Unknown')}</value></div>
+    <div class="inspect-field"><label>MAC Address</label><value>${esc(device.mac_address||'—')}</value></div>
+    <div class="inspect-field"><label>Vendor / OUI</label><value>${esc(device.vendor||device.manufacturer||'Unknown')}</value></div>
+    <div class="inspect-field"><label>Device Type</label><value>${esc(device.device_type||'unknown')}</value></div>
+    <div class="inspect-field"><label>OS / Platform</label><value>${esc(device.os_family||'Unknown')}</value></div>
+    <div class="inspect-field"><label>Model</label><value>${esc(device.model||'Unknown')}</value></div>
+    <div class="inspect-field"><label>Firmware</label><value style="font-size:10px;">${esc(device.firmware||'Unknown')}</value></div>
+    <div class="inspect-field"><label>Serial Number</label><value>${esc(device.serial_number||'N/A')}</value></div>
+    <div class="inspect-field"><label>JARM Hash</label><value style="font-size:9px;">${esc(device.jarm_hash||'—')}</value></div>
+    <div class="inspect-field"><label>Risk Score</label><value class="${rc(device.risk_level).t}">${device.risk_score||0} / 100 · ${esc(device.risk_level||'UNKNOWN')}</value></div>
+    <div class="inspect-field"><label>Status</label><value>${esc(device.status||'unknown')}</value></div>
+  </div>
+  <div class="inspect-section-title">Open Ports</div>
+  <div class="port-pills" style="margin-bottom:14px;">${ports||'<span style="color:var(--dim);font-size:10px;">None detected</span>'}</div>
+  <div class="inspect-section-title">Known Vulnerabilities (${vulns.length})</div>
+  <div class="inspect-vulns">${vhtml}</div>
+  <div class="inspect-section-title">AI Security Audit</div>
+  <button class="ai-audit-btn" id="ai-btn" onclick='runAI(${JSON.stringify(device).replace(/'/g,"&#39;")})'>
+    <i class="fas fa-robot" style="margin-right:6px;font-size:9px;"></i>Run Groq AI Audit
+  </button>
+  <div id="ai-findings" class="ai-findings"></div>`;
+  document.getElementById('inspect-modal').classList.remove('hidden');
+}
+function closeInspect(){document.getElementById('inspect-modal').classList.add('hidden');}
+document.getElementById('inspect-modal').addEventListener('click',function(e){if(e.target===this)closeInspect();});
+
+async function runAI(device){
+  const btn=document.getElementById('ai-btn'),findings=document.getElementById('ai-findings');
+  btn.disabled=true;btn.innerHTML='<i class="fas fa-circle-notch fa-spin" style="margin-right:6px;font-size:9px;"></i>Analysing with Groq...';
+  findings.innerHTML='<div style="color:var(--dim);font-size:10px;padding:8px 0;">Sending to Groq AI — please wait...</div>';
+  try{
+    const result=await api('/ai/audit',{method:'POST',body:JSON.stringify({ip_address:device.ip_address,open_ports:device.open_ports||[],vendor:device.vendor||'',os_family:device.os_family||'',hostname:device.hostname||'',vulnerabilities:device.vulnerabilities||[]})});
+    const list=result.findings||[];
+    if(list.length===0){findings.innerHTML='<div style="color:var(--green);font-size:10px;">✓ No additional AI findings.</div>';}
+    else{findings.innerHTML=list.map(f=>`<div class="inspect-vuln ${esc(f.severity)}"><div class="vuln-head"><span class="vuln-cve">${esc(f.type||'Finding')}</span>${f.cve?`<span class="cve-badge ${sc(f.severity)}">${esc(f.cve)}</span>`:''}<span class="cve-badge ${sc(f.severity)}">${esc(f.severity)}</span></div><div class="vuln-desc">${esc(f.description||'')}</div>${(f.remediation||[]).length?`<div style="margin-top:5px;font-size:9px;color:var(--green);">▸ ${f.remediation.map(r=>esc(r)).join('<br>▸ ')}</div>`:''}</div>`).join('');}
+  }catch(e){findings.innerHTML=`<div style="color:var(--red);font-size:10px;">AI audit failed: ${esc(e.message)}</div>`;}
+  finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-robot" style="margin-right:6px;font-size:9px;"></i>Re-run Groq AI Audit';}
+}
 </script>
 </body>
 </html>
