@@ -40,7 +40,8 @@ def _broadcast_ws(event_type: str, message: str):
     try:
         import redis
         r = redis.Redis(host=os.getenv("SIN_REDIS_HOST","redis"), port=int(os.getenv("SIN_REDIS_PORT","6379")), password=os.getenv("SIN_REDIS_PASSWORD",""), socket_connect_timeout=2)
-        r.publish("sin:ws:stream", json.dumps({"type": event_type, "message": message, "timestamp": datetime.now(timezone.utc).isoformat()}))
+        msg = json.loads(message) if isinstance(message, str) else message
+        r.publish("sin:ws:stream", json.dumps({"type": event_type, "message": msg, "timestamp": datetime.now(timezone.utc).isoformat()}))
     except Exception as e:
         logger.debug(f"WS broadcast failed: {e}")
 
@@ -136,10 +137,10 @@ class AgentRunner:
         asset = normalize_host(asset)
         vendor = asset.get("manufacturer") or asset.get("vendor") or "Unknown"
         ports = asset.get("open_ports", [])
-        _broadcast_ws("FLOW_NEW", json.dumps({"src": ip, "dst": "192.168.30.1", "proto": "TCP"}))
+        _broadcast_ws("FLOW_NEW", {"src": ip, "dst": "192.168.30.1", "proto": "TCP"})
         for port, label in _DANGEROUS_PORTS.items():
             if port in set(ports):
-                _broadcast_ws("TRAFFIC_ALERT", json.dumps({"anomaly": f"{ip} [{vendor}] — {label} (:{port})"}))
+                _broadcast_ws("TRAFFIC_ALERT", {"anomaly": f"{ip} [{vendor}] — {label} (:{port})"})
         verdict: ThreatVerdict = self.decision.evaluate(asset)
         asset["risk_score"] = round(verdict.confidence * 100)
         asset["risk_level"] = verdict.severity
