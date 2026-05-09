@@ -135,7 +135,7 @@ class MitigationEngine:
 
             while not stop_event.is_set():
                 try:
-       	            sendp(poison_pkt, iface=conf.iface, verbose=False)
+                       sendp(poison_pkt, iface=conf.iface, verbose=False)
                     # Send packet at layer 2 - COMMENTED OUT TO PREVENT NETWORK DOS
                 except Exception as e:
                     logger.error(f"ARP poison failed for {target_ip}: {e}")
