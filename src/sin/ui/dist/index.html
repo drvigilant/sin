@@ -494,7 +494,7 @@ tbody td:last-child{padding-right:14px;}
 
 <script>
 const API='/api', WS='/ws/events';
-let API_KEY=sessionStorage.getItem('sin_api_key')||'';
+let API_KEY=localStorage.getItem('sin_api_key')||'';
 let ws=null,scanPoll=null,devices=[],flowBuf=[],anomalyBuf=[];
 const startT=Date.now();
 const VC=['#58a6ff','#f85149','#d29922','#2ea043','#8957e5','#d97757','#3fb950','#e3b341'];
@@ -531,7 +531,7 @@ document.getElementById('key-submit').addEventListener('click',async()=>{
   try{
     const r=await fetch(API+'/health',{headers:{'X-API-Key':k}});
     if(r.status===401){document.getElementById('key-err').textContent='Invalid API key.';btn.textContent='Connect to SIN Engine →';btn.disabled=false;return;}
-    API_KEY=k;sessionStorage.setItem('sin_api_key',k);hideKey();init();
+    API_KEY=k;localStorage.setItem('sin_api_key',k);hideKey();init();
   }catch(e){document.getElementById('key-err').textContent='Cannot reach SIN engine.';btn.textContent='Connect to SIN Engine →';btn.disabled=false;}
 });
 document.getElementById('key-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('key-submit').click();});
