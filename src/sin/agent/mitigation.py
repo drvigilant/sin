@@ -130,13 +130,16 @@ class MitigationEngine:
 
         def arp_poison_loop():
             logger.warning(f"🚨 ARP Quarantine Initiated: Blackholing {target_ip} from Gateway {gateway_ip}")
-            # Craft the poison packet: Tells the target that the Gateway is at 00:00:00:00:00:00
-            poison_pkt = Ether(dst=target_mac) / ARP(op=2, psrc=gateway_ip, pdst=target_ip, hwsrc=fake_mac)
+            # Direction 1: Tell TARGET that gateway MAC = blackhole
+            pkt_to_target = Ether(dst=target_mac) / ARP(op=2, psrc=gateway_ip, pdst=target_ip, hwsrc=fake_mac)
+            # Direction 2: Tell GATEWAY that target MAC = blackhole
+            gateway_mac = getmacbyip(gateway_ip) or "ff:ff:ff:ff:ff:ff"
+            pkt_to_gateway = Ether(dst=gateway_mac) / ARP(op=2, psrc=target_ip, pdst=gateway_ip, hwsrc=fake_mac)
 
             while not stop_event.is_set():
                 try:
-                       sendp(poison_pkt, iface=conf.iface, verbose=False)
-                    # Send packet at layer 2 - COMMENTED OUT TO PREVENT NETWORK DOS
+                    sendp(pkt_to_target, iface=conf.iface, verbose=False)
+                    sendp(pkt_to_gateway, iface=conf.iface, verbose=False)
                 except Exception as e:
                     logger.error(f"ARP poison failed for {target_ip}: {e}")
                 stop_event.wait(2.0)

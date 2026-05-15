@@ -51,6 +51,9 @@ services:
   api:
     build: .
     container_name: sin_api
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     command: >
       sh -c "python -c 'from sin.storage.init_db import init_db; init_db()' &&
              uvicorn sin.api.server:app --host 0.0.0.0 --port 8000"
