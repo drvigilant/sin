@@ -64,3 +64,4 @@ dist/*
 .env
 .env
 celerybeat-schedule
+celerybeat-schedule
