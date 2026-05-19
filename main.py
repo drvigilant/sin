@@ -39,7 +39,7 @@ def scan(subnet, output):
     
     agent = AgentRunner()
     try:
-        agent.run_assessment(target_subnet, output)
+        agent.run_assessment(target_subnet)
     except KeyboardInterrupt:
         logger.warning("Operation interrupted by user.")
     except Exception as e:

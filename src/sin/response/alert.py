@@ -12,11 +12,23 @@ class DiscordAlerter:
     """
     def __init__(self):
         self.webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-        # Connect to your existing Redis instance
-        self.redis_client = redis.Redis(host='redis', port=6379, db=0)
         self.cache_key_prefix = "sin:alerted:"
         # Set expiry to 24 hours (86400 seconds) so you get a reminder once a day if the threat persists
-        self.expiry = 86400 
+        self.expiry = 86400
+        # Connect to Redis using env vars so it works both inside Docker and bare-metal
+        self.redis_client = None
+        try:
+            self.redis_client = redis.Redis(
+                host=os.getenv("SIN_REDIS_HOST", "redis"),
+                port=int(os.getenv("SIN_REDIS_PORT", "6379")),
+                password=os.getenv("SIN_REDIS_PASSWORD", "") or None,
+                db=0,
+                socket_connect_timeout=2
+            )
+            self.redis_client.ping()
+        except Exception as e:
+            logger.warning(f"DiscordAlerter: Redis unavailable, alert deduplication disabled ({e})")
+            self.redis_client = None
 
     def send_critical_alert(self, ip: str, vulnerabilities: list):
         if not self.webhook_url:
@@ -25,7 +37,7 @@ class DiscordAlerter:
         # DEDUPLICATION LOGIC:
         # Check if the key exists in Redis for this IP
         redis_key = f"{self.cache_key_prefix}{ip}"
-        if self.redis_client.exists(redis_key):
+        if self.redis_client and self.redis_client.exists(redis_key):
             logger.debug(f"Alert for {ip} suppressed (Redis record found)")
             return
 
@@ -51,7 +63,8 @@ class DiscordAlerter:
             response = requests.post(self.webhook_url, json=payload, timeout=5)
             if response.status_code == 204: # Discord success code
                 # Mark this IP as alerted in Redis with an expiry
-                self.redis_client.setex(redis_key, self.expiry, "1")
+                if self.redis_client:
+                    self.redis_client.setex(redis_key, self.expiry, "1")
                 logger.info(f"🚨 Sent Discord alert for {ip}")
             else:
                 logger.error(f"Discord API returned status {response.status_code}")
