@@ -65,3 +65,11 @@ dist/*
 .env
 celerybeat-schedule
 celerybeat-schedule
+
+# Claude Code editor settings
+.claude/
+
+# Compiled Go binaries
+scanner/sin-scanner
+scanner/sin-sniffer
+scanner/sin-sensor

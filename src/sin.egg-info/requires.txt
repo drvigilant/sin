@@ -1,4 +1,0 @@
-click
-python-dotenv
-pyyaml
-pydantic
