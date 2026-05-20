@@ -83,9 +83,9 @@ async def startup_event():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=os.getenv("SIN_ALLOWED_ORIGINS", "http://localhost,http://localhost:8501").split(","),
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["X-API-Key", "Content-Type"],
 )
 
 @app.middleware("http")
@@ -113,15 +113,23 @@ def get_db():
         db.close()
 # In server.py
 @app.delete("/devices/purge-non-iot")
-def purge_non_iot_devices(db: Session = Depends(get_db)):
-    """Remove device_logs for IPs whose hostname matches non-IoT patterns."""
-    deleted = db.query(models.DeviceLog).filter(
+def purge_non_iot_devices(dry_run: bool = True, db: Session = Depends(get_db)):
+    """Remove device_logs for IPs whose hostname matches non-IoT patterns.
+
+    dry_run=True (default): returns count of records that WOULD be deleted, no changes made.
+    dry_run=False: performs the deletion and writes an audit log entry.
+    """
+    q = db.query(models.DeviceLog).filter(
         models.DeviceLog.hostname.ilike("desktop-%") |
         models.DeviceLog.hostname.ilike("laptop-%") |
-        models.DeviceLog.hostname == "Unknown"
-    ).delete(synchronize_session=False)
-    db.commit()
-    return {"deleted": deleted}
+        (models.DeviceLog.hostname == "Unknown")
+    )
+    count = q.count()
+    if not dry_run:
+        q.delete(synchronize_session=False)
+        db.commit()
+        logger.warning(f"[PURGE] purge-non-iot executed: {count} records permanently deleted")
+    return {"deleted": count, "dry_run": dry_run}
 
 class ScanRequest(BaseModel):
     subnet: Optional[str] = None
@@ -385,20 +393,25 @@ async def ai_audit(request: OllamaAuditRequest):
     finally:
         db.close()
 
+    def _s(val, max_len=80) -> str:
+        """Sanitize a device field before interpolating into the AI prompt."""
+        import re
+        return re.sub(r"[^\w.\-:/ ]", "", str(val or "Unknown"))[:max_len]
+
     prompt = f"""You are an expert IoT penetration tester and SOC analyst specialising in CCTV and embedded device security.
 
 Perform a full security assessment on this device and return a JSON array of findings.
 
 Device Context:
-- IP Address: {request.ip_address}
-- MAC Address: {mac}
-- Vendor: {vendor}
-- Model: {model_name}
-- Device Type: {device_type}
-- Firmware Version: {firmware}
-- Serial Number: {serial}
+- IP Address: {_s(request.ip_address)}
+- MAC Address: {_s(mac)}
+- Vendor: {_s(vendor)}
+- Model: {_s(model_name)}
+- Device Type: {_s(device_type)}
+- Firmware Version: {_s(firmware)}
+- Serial Number: {_s(serial)}
 - Open Ports: {open_ports}
-- OS Family: {request.os_family or 'Embedded Linux'}
+- OS Family: {_s(request.os_family or 'Embedded Linux')}
 - Known Vulnerabilities Already Detected: {json.dumps(vulns)}
 
 Your tasks:

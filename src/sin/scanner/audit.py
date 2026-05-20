@@ -104,8 +104,8 @@ class AuditEngine:
             if 34567 in ports:
                 vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": "Xiongmai DVR service unauthenticated."})
                 risk_score += 90
-        if "hikvision" in mfr or 8000 in ports:
-            if "hikvision-httppreview" in banners or 80 in ports:
+        if "hikvision" in mfr or "hikvision-httppreview" in banners:
+            if 8000 in ports or 80 in ports:
                 vulnerabilities.append({"severity": "CRITICAL", "type": "Backdoor Access", "cve": "CVE-2017-7921", "description": "Potential Hikvision backdoor."})
                 risk_score += 85
         if "dahua" in mfr or 37777 in ports:

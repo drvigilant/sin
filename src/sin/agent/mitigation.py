@@ -8,6 +8,7 @@ even if SIN is not the network's default gateway.
 import subprocess
 import threading
 import time
+import re
 from typing import Dict, Any
 
 from sin.utils.logger import get_logger
@@ -106,6 +107,27 @@ class MitigationEngine:
             logger.error(f"iptables enforcement failed for {ip}: {e}")
             return {"target": ip, "method": "iptables", "status": "failed", "error": str(e)}
 
+    def _detect_gateway(self, target_ip: str) -> str:
+        """
+        Detect the actual gateway for target_ip by reading the kernel routing table.
+        Falls back to subnet .1 with a warning if detection fails.
+        """
+        try:
+            out = subprocess.check_output(
+                ["ip", "route", "get", target_ip],
+                text=True, timeout=3
+            )
+            m = re.search(r"via ([\d.]+)", out)
+            if m:
+                logger.debug(f"Detected gateway {m.group(1)} for {target_ip}")
+                return m.group(1)
+        except Exception as e:
+            logger.warning(f"Gateway detection failed for {target_ip}: {e}")
+        # Fallback
+        gw = ".".join(target_ip.split(".")[:3]) + ".1"
+        logger.warning(f"Using fallback gateway {gw} for {target_ip} — verify this is correct")
+        return gw
+
     def _apply_arp_quarantine(self, target_ip: str, target_mac: str) -> dict:
         """
         Actively isolates the target by continuously telling it that the Gateway's IP
@@ -115,10 +137,7 @@ class MitigationEngine:
             logger.info(f"[DRY-RUN] Would start ARP Quarantine thread for {target_ip}")
             return {"target": target_ip, "method": "arp_quarantine", "status": "simulated"}
 
-        # Determine the gateway IP (assuming .1 of the target's subnet for standard IoT LANs)
-        # In a production environment, this should be parsed from `ip route`
-        subnet_base = ".".join(target_ip.split(".")[:3])
-        gateway_ip = f"{subnet_base}.1"
+        gateway_ip = self._detect_gateway(target_ip)
         fake_mac = "00:00:00:00:00:00"  # The Blackhole MAC
 
         if target_ip in self._active_quarantines:

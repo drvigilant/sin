@@ -182,8 +182,10 @@ class AgentRunner:
                     db.add(models.SecurityEvent(ip_address=ip, event_type=drift["event_type"], severity=drift["severity"], description=drift["description"]))
                 baseline_engine.snapshot(asset, db)
                 if asset.get("risk_score", 0) >= 60:
-                    try: self.alerter.send_critical_alert(ip, asset.get("vulnerabilities", []))
-                    except: pass
+                    try:
+                        self.alerter.send_critical_alert(ip, asset.get("vulnerabilities", []))
+                    except Exception as exc:
+                        logger.error(f"[ALERT] Discord notification failed for {ip}: {exc}")
             db.commit()
         except Exception as exc:
             db.rollback()
