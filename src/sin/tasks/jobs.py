@@ -46,3 +46,22 @@ def run_network_scan(subnet="192.168.30"):
                 pass
 
     return "Scan Complete"
+
+# ── Quarantine Tasks (run on worker: network_mode=host, NET_RAW) ──────────────
+from sin.agent.mitigation import MitigationEngine
+from sin.agent.decision import ThreatVerdict
+
+_mitigation_engine = MitigationEngine(dry_run=False)
+
+@shared_task(name="quarantine_device", queue="celery", acks_late=True)
+def quarantine_device(ip: str, mac: str = "unknown"):
+    logger.info(f"[QUARANTINE] Received task for {ip}")
+    verdict = ThreatVerdict(severity="CRITICAL", confidence=1.0, recommended_action="isolate")
+    result = _mitigation_engine.isolate({"ip_address": ip, "mac_address": mac}, verdict)
+    return {"ip": ip, "status": result.details.get("status"), "details": result.details}
+
+@shared_task(name="lift_quarantine", queue="celery", acks_late=True)
+def lift_quarantine(ip: str):
+    logger.info(f"[LIFT] Received lift task for {ip}")
+    result = _mitigation_engine.lift_isolation(ip)
+    return result

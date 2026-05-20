@@ -22,7 +22,7 @@ type AnomalySignal struct {
 	Details   string `json:"details"`
 }
 
-func main() {
+func StartSniffer() {
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: ./sin-sniffer <interface> (e.g., ./sin-sniffer eth0)")
 	}

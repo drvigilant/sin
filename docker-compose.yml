@@ -76,6 +76,7 @@ services:
       - SIN_API_KEY=${SIN_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - SIN_GATEWAY_IP=192.168.30.1
       - DRY_RUN=false
     restart: unless-stopped
     networks:
@@ -113,6 +114,7 @@ services:
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - SIN_GATEWAY_IP=192.168.30.1
     cap_add:
       - NET_RAW
       - NET_ADMIN

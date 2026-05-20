@@ -496,18 +496,14 @@ def agent_status():
 def isolate_device(ip: str, db: Session = Depends(get_db)):
     if _sin_agent is None:
         raise HTTPException(503, "Agent not running")
-
     device = db.query(models.DeviceLog).filter(models.DeviceLog.ip_address == ip).first()
     if not device:
         raise HTTPException(404, "Device not found in registry")
-
-    from sin.agent.decision import ThreatVerdict
-    verdict = ThreatVerdict(severity="CRITICAL", confidence=1.0, recommended_action="isolate")
-
-    result = _sin_agent.mitigation.isolate({"ip_address": ip, "mac_address": device.mac_address or "unknown"}, verdict)
+    from sin.tasks.celery_app import celery_app as _celery
+    mac = device.mac_address or "unknown"
+    task = _celery.send_task("quarantine_device", args=[ip, mac])
     _sin_agent.registry.mark_mitigated(ip)
-
-    return {"status": "isolated", "ip": ip, "details": result.details}
+    return {"status": "queued", "ip": ip, "task_id": task.id, "mac": mac}
 
 @app.post("/agent/whitelist/{ip}")
 def whitelist_device(ip: str):
@@ -515,10 +511,11 @@ def whitelist_device(ip: str):
     _sin_agent.whitelist_device(ip)
     return {"status": "whitelisted", "ip": ip}
 
-@app.post("/agent/lift/{ip}")
-def lift_isolation(ip: str):
-    if _sin_agent is None: raise HTTPException(503, "Agent not running")
-    return _sin_agent.lift_isolation(ip)
+@app.delete("/agent/isolate/{ip}")
+def lift_device(ip: str):
+    from sin.tasks.celery_app import celery_app as _celery
+    task = _celery.send_task("lift_quarantine", args=[ip])
+    return {"status": "lift_queued", "ip": ip, "task_id": task.id}
 
 @app.get("/agent/mitigations")
 def list_mitigations():

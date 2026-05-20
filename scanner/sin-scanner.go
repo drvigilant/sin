@@ -421,7 +421,8 @@ var ouiTable = map[string]string{
 	"A040A0": "NETGEAR", "C03F0E": "NETGEAR",
 	"EC7176": "Reolink", "DCEF09": "Amcrest",
 	"B827EB": "Raspberry Pi", "DCA632": "Raspberry Pi",
-	"D46137": "Securus", // Securus OUI from Swatak screenshot (d4:61:37)
+	"D46137": "Securus",
+	"001233": "Securus", // Securus OUI from Swatak screenshot (d4:61:37)
 }
 
 func lookupOUI(mac string) string {
@@ -695,7 +696,7 @@ func scanHost(ip string) *Device {
 		case strings.Contains(bl, "ubiquiti"):
 			vendor = "Ubiquiti"
 		case strings.Contains(bl, "securus"):
-			vendor = "Securus"
+			vendor = "SECURUS"
 		case strings.Contains(bl, "nbl-web"), strings.Contains(bl, "nbl"):
 			vendor = "NBL"
 		}
