@@ -545,3 +545,33 @@ async def ws_events(websocket: WebSocket):
     finally:
         await pubsub.unsubscribe("sin:ws:stream")
         await r.close()
+
+# ── Firmware Analysis Endpoints ──────────────────────────────────────────────
+import shutil
+from fastapi import UploadFile, File
+from sin.firmware.extractor import FirmwareExtractor
+from sin.firmware.secret_extractor import SecretExtractor
+
+_FIRMWARE_UPLOAD_DIR = "/var/lib/sin/firmware/uploads"
+os.makedirs(_FIRMWARE_UPLOAD_DIR, exist_ok=True)
+
+@app.post("/firmware/upload")
+async def upload_firmware(file: UploadFile = File(...)):
+    file_path = os.path.join(_FIRMWARE_UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    extract_result = FirmwareExtractor().extract(file_path)
+    secret_result = {}
+    if extract_result["success"] and extract_result["extracted_path"]:
+        secret_result = SecretExtractor().scan(extract_result["extracted_path"])
+    return {**extract_result, **secret_result}
+
+@app.get("/firmware/results/{filename}")
+async def firmware_results(filename: str):
+    path = f"/var/lib/sin/firmware/{filename}"
+    if not os.path.isdir(path):
+        raise HTTPException(status_code=404, detail="Firmware results not found")
+    files = []
+    for root, _, fs in os.walk(path):
+        files.extend(fs)
+    return {"filename": filename, "file_count": len(files), "path": path}

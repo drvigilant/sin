@@ -82,6 +82,9 @@ services:
     networks:
       - sin_internal
       - sin_scan
+    volumes:
+      - /var/lib/sin:/var/lib/sin
+      - ./src:/app/src
     deploy:
       resources:
         limits:
