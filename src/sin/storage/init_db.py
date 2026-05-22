@@ -21,7 +21,8 @@ ADDED:  Safe column migration for existing deployments.
 from __future__ import annotations
 
 from sin.storage.database import Base, engine
-from sin.storage import models  # noqa: F401 — registers models with Base.metadata
+from sin.storage import models
+from sin.storage import credential_vault  # noqa: F401  # noqa: F401 — registers models with Base.metadata
 from sin.utils.logger import get_logger
 
 logger = get_logger("sin.storage.init")
