@@ -1,8 +1,6 @@
-```python
 # src/sin/firmware/extractor.py
 import os
 import shutil
-import tempfile
 import subprocess
 import platform
 from datetime import datetime
@@ -41,7 +39,7 @@ class FirmwareExtractor:
 
             cmd = [
                 self.BINWALK_PATH,
-                "-e", firmware_path,
+                "-e", "--run-as=root", firmware_path,
                 "-v", "-C", extract_path
             ]
 
@@ -88,4 +86,4 @@ class FirmwareExtractor:
             logger.error(f"Unexpected error: {e}", exc_info=True)
 
         return result
-```
+
