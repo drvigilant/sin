@@ -152,6 +152,16 @@ class AuditEngine:
         vulnerabilities = _epss.enrich_findings(vulnerabilities)
         if any(v.get("epss", 0.0) >= 0.5 for v in vulnerabilities): risk_score = min(risk_score + 10, 100)
 
+        # ── LAYER 4: ONVIF SECURITY AUDIT ─────────────────────────────────────
+        try:
+            from sin.scanner.onvif_audit import onvif_auditor
+            onvif_findings = onvif_auditor.audit(ip, list(ports))
+            for f in onvif_findings:
+                f.setdefault("epss", 0.0)
+                vulnerabilities.append(f)
+        except Exception as e:
+            logger.debug(f"ONVIF audit error for {ip}: {e}")
+
         vulnerabilities = [_attach_remediation(v) for v in vulnerabilities]
 
         # Action Verdict
