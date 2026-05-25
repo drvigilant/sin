@@ -150,7 +150,19 @@ class MitigationEngine:
 
 
         # Resolve gateway MAC BEFORE thread starts
-        gateway_mac = getmacbyip(gateway_ip)
+        # Try kernel ARP table first (faster, no Scapy ARP broadcast needed)
+        gateway_mac = None
+        try:
+            with open('/proc/net/arp') as f:
+                for line in f.readlines()[1:]:
+                    parts = line.split()
+                    if parts[0] == gateway_ip and parts[2] != '00:00:00:00:00:00':
+                        gateway_mac = parts[3]
+                        break
+        except Exception:
+            pass
+        if not gateway_mac:
+            gateway_mac = getmacbyip(gateway_ip) if getmacbyip else None
         if not gateway_mac:
             logger.error(f'Cannot resolve gateway MAC for {gateway_ip} — aborting quarantine')
             return {'target': target_ip, 'method': 'arp_quarantine', 'status': 'failed', 'error': 'gateway MAC unresolvable'}

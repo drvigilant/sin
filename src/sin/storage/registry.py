@@ -107,6 +107,15 @@ class DeviceRegistry:
                     record.open_ports      = host.get("open_ports", [])
                     record.protocols       = host.get("protocol_hints", [])
                     record.vulnerabilities = host.get("vulnerabilities", [])
+                    record.mac_address     = host.get("mac_address")
+                    record.device_type     = host.get("device_type")
+                    record.risk_score      = host.get("risk_score")
+                    record.risk_level      = host.get("risk_level")
+                    record.risk_reasons    = host.get("risk_reasons", [])
+                    record.telemetry       = host.get("telemetry", {})
+                    record.firmware        = host.get("firmware")
+                    record.serial_number   = host.get("serial")
+                    record.model           = host.get("model")
                 else:
                     new_status[ip] = True
                     record = DeviceLog(
@@ -119,6 +128,15 @@ class DeviceRegistry:
                         open_ports     = host.get("open_ports", []),
                         protocols      = host.get("protocol_hints", []),
                         vulnerabilities= host.get("vulnerabilities", []),
+                        mac_address    = host.get("mac_address"),
+                        device_type    = host.get("device_type"),
+                        risk_score     = host.get("risk_score"),
+                        risk_level     = host.get("risk_level"),
+                        risk_reasons   = host.get("risk_reasons", []),
+                        telemetry      = host.get("telemetry", {}),
+                        firmware       = host.get("firmware"),
+                        serial_number  = host.get("serial"),
+                        model          = host.get("model"),
                     )
                     db.add(record)
                     existing_map[ip] = record  # Prevent duplicates in the same batch
