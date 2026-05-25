@@ -160,7 +160,7 @@ class AuditEngine:
                 f.setdefault("epss", 0.0)
                 vulnerabilities.append(f)
         except Exception as e:
-            logger.debug(f"ONVIF audit error for {ip}: {e}")
+            logger.warning(f"ONVIF audit error for {ip}: {e}")
 
         vulnerabilities = [_attach_remediation(v) for v in vulnerabilities]
 
