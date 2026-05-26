@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from contextlib import asynccontextmanager
 import asyncio
 import httpx
 import json
@@ -68,24 +69,24 @@ def _set_scan_running(value: bool) -> None:
         except Exception:
             pass
 
-app = FastAPI(title="SIN Enterprise API")
-
 # ── Global Agent Instance ──
 _sin_agent = None
 _packet_sniffer: PacketSniffer | None = None
 
-@app.on_event("startup")
-async def startup_event():
+# ── Lifespan Manager (Modern Replacement for on_event) ──
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
     global _sin_agent, _packet_sniffer
     _sin_agent = SINAgent()
     _packet_sniffer = PacketSniffer()
     _packet_sniffer.start()
     logger.info("SIN Agent initialized in API context.")
-
-@app.on_event("shutdown")
-async def shutdown_event():
+    
+    yield  # Yields control back to FastAPI while running
+    
+    # Shutdown logic
     logger.info("🚨 SIGTERM received. Initiating graceful shutdown...")
-    global _packet_sniffer
     if _packet_sniffer is not None:
         logger.info("Stopping Packet Sniffer...")
         _packet_sniffer.stop()
@@ -97,6 +98,8 @@ async def shutdown_event():
         except Exception as e:
             logger.error(f"Failed to clear Redis locks during shutdown: {e}")
     logger.info("✅ Graceful shutdown complete. Safe to terminate.")
+
+app = FastAPI(title="SIN Enterprise API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -129,8 +132,8 @@ def get_db():
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     health_status = {
-        "api": "online", 
-        "database": "offline", 
+        "api": "online",
+        "database": "offline",
         "redis": "offline",
         "agent": "offline"
     }
@@ -157,7 +160,7 @@ def health_check(db: Session = Depends(get_db)):
         health_status["agent"] = "online"
 
     health_status["status"] = "healthy" if status_code == 200 else "degraded"
-    
+
     return JSONResponse(status_code=status_code, content=health_status)
 
 # ── API Endpoints ────────────────────────────────────────────────────────────
@@ -323,3 +326,71 @@ async def firmware_results(filename: str):
     for root, _, fs in os.walk(path):
         files.extend(fs)
     return {"filename": filename, "file_count": len(files), "path": path}
+
+
+# ── Credentials API ──────────────────────────────────────────────────────────
+from sin.storage.credential_vault import vault as _vault
+
+class CredentialRequest(BaseModel):
+    ip_address: Optional[str] = None
+    vendor: Optional[str] = None
+    username: str
+    password: str
+    protocol: str = "onvif"
+    priority: int = 50
+
+@app.post("/credentials")
+def add_credential(req: CredentialRequest):
+    try:
+        result = _vault.add(
+            ip_address=req.ip_address,
+            vendor=req.vendor,
+            username=req.username,
+            password=req.password,
+            protocol=req.protocol,
+            priority=req.priority,
+        )
+        return {"status": "created", "id": result["id"]}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/credentials")
+def list_credentials():
+    try:
+        from sin.storage.database import SessionLocal
+        from sin.storage.credential_vault import DeviceCredential
+        db = SessionLocal()
+        rows = db.query(DeviceCredential).all()
+        db.close()
+        return [
+            {
+                "id": r.id,
+                "ip_address": r.ip_address,
+                "vendor": r.vendor,
+                "username": r.username,
+                "password": "***",
+                "protocol": r.protocol,
+                "priority": r.priority,
+                "last_success": str(r.last_success) if r.last_success else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.delete("/credentials/{cred_id}")
+def delete_credential(cred_id: int):
+    try:
+        from sin.storage.database import SessionLocal
+        from sin.storage.credential_vault import DeviceCredential
+        db = SessionLocal()
+        row = db.query(DeviceCredential).filter(DeviceCredential.id == cred_id).first()
+        if not row:
+            db.close()
+            return JSONResponse(status_code=404, content={"error": "not found"})
+        db.delete(row)
+        db.commit()
+        db.close()
+        return {"status": "deleted", "id": cred_id}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
