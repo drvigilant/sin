@@ -147,9 +147,7 @@ class AgentRunner:
         asset["risk_reasons"] = verdict.reasons
         asset["verdict"] = {"score": verdict.score, "confidence": verdict.confidence, "severity": verdict.severity, "action": verdict.recommended_action, "signals": verdict.signal_count}
         auto_quarantine_critical = _policy_enabled("auto_quarantine_critical", True)
-        device_type_str = str(asset.get("device_type", "")).lower()
-        is_camera = any(t in device_type_str for t in {"camera", "nvr", "dvr", "ipc"})
-        force_auto_quarantine = auto_quarantine_critical and asset.get("risk_score", 0) > 90 and not is_camera
+        force_auto_quarantine = auto_quarantine_critical and asset.get("risk_score", 0) > 90
         if verdict.is_actionable(_CONFIDENCE_THRESHOLD) or force_auto_quarantine:
             try:
                 result = self.mitigation.isolate(asset, verdict)

@@ -1,24 +1,27 @@
-# SIN Current State - 2026-05-25
+# SIN Current State
 
-## TODAY'S COMPLETED
-- ONVIF audit now persisting to DB for all camera types ✅
-- Swatak V8 cameras (30.210-214) detected with SWATAK-2026-001/003 ✅  
-- Camera auto-quarantine exemption added to runner.py ✅
-- logger.debug → logger.warning for ONVIF audit errors ✅
+## Stack
+Python 3.11, FastAPI, SQLAlchemy, Celery+Redis, PostgreSQL 15, Docker
+Groq API key in .env (use for Open WebUI)
 
-## NEXT STEPS (in order)
-1. Build credentials REST API (POST/GET/DELETE /credentials)
-2. Add 192.168.99.x subnet to scan config
-3. Build firmware risk classifier from ONVIF firmware strings
-4. Update dashboard to show ONVIF findings and firmware risk
+## Validated Working
+- API: http://localhost:8000/health ✅
+- Dashboard: http://localhost:8501 ✅
+- PostgreSQL: 725 devices, 22 columns in device_logs ✅
+- Celery: 3 tasks registered ✅
+- Binwalk v2.4.3 inside sin_api container ✅
+- /var/lib/sin/firmware/ output directory ✅
 
-## KEY FILES
-- src/sin/scanner/onvif_audit.py — ONVIF security auditor
-- src/sin/scanner/audit.py — line 153: ONVIF layer 4
-- src/sin/agent/runner.py — line 152: camera quarantine exemption
-- src/sin/agent/mitigation.py — ARP quarantine engine
+## Completed Modules
+- src/sin/firmware/__init__.py ✅
+- src/sin/firmware/extractor.py ✅
 
-## INFRA
-- API: localhost:8000, Worker: sin_worker, DB: sin_db port 5433
-- API Key: a634fd2d20eb8dd013eab32bdbf9529694abb5e46a35dd92d531faf34f1f0291
-- Swatak cameras on 192.168.30.210-214 (V8 firmware, HTTPS port 443)
+## Next Step
+Build src/sin/firmware/secret_extractor.py
+
+## Known Gaps
+- telemetry column always {} 
+- mac_address Unknown on most devices
+- No secret_extractor yet
+- No sbom_generator yet
+- No hardware module yet
