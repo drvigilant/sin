@@ -37,11 +37,32 @@ def _normalise_mac_prefix(raw_mac: str) -> str:
     return ":".join(parts[:3])
 
 def _broadcast_ws(event_type: str, message: str):
+    """Broadcast events to WebSocket clients"""
     try:
+        # Try direct queue first (fast path)
+        try:
+            from sin.api.server import _publish_ws_event
+            msg = json.loads(message) if isinstance(message, str) else message
+            _publish_ws_event(event_type, msg)
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: Redis pub/sub
         import redis
-        r = redis.Redis(host=os.getenv("SIN_REDIS_HOST","redis"), port=int(os.getenv("SIN_REDIS_PORT","6379")), password=os.getenv("SIN_REDIS_PASSWORD",""), socket_connect_timeout=2)
+        r = redis.Redis(
+            host=os.getenv("SIN_REDIS_HOST","redis"),
+            port=int(os.getenv("SIN_REDIS_PORT","6379")),
+            password=os.getenv("SIN_REDIS_PASSWORD",""),
+            socket_connect_timeout=2,
+            decode_responses=True
+        )
         msg = json.loads(message) if isinstance(message, str) else message
-        r.publish("sin:ws:stream", json.dumps({"type": event_type, "message": msg, "timestamp": datetime.now(timezone.utc).isoformat()}))
+        r.publish("sin:ws:stream", json.dumps({
+            "type": event_type,
+            "message": msg,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }))
     except Exception as e:
         logger.debug(f"WS broadcast failed: {e}")
 

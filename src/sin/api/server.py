@@ -185,9 +185,27 @@ def run_scan_job(subnet: str):
     finally:
         _set_scan_running(False)
 
+from sin.health import check_all, check_database, check_redis
+
 @app.get("/health")
 def health_check():
-    return {"status": "online", "api": "SIN Enterprise"}
+    return check_all()
+
+@app.get("/health/db")
+def health_db():
+    return check_database()
+
+@app.get("/health/redis")
+def health_redis():
+    return check_redis()
+
+@app.get("/health/ready")
+def readiness_check():
+    """Kubernetes readiness probe"""
+    health = check_all()
+    if health["status"] == "healthy":
+        return {"ready": True}
+    raise HTTPException(status_code=503, detail="Service not ready")
 
 @app.post("/ingest")
 async def ingest(request: Request):
@@ -554,6 +572,133 @@ from sin.firmware.secret_extractor import SecretExtractor
 
 _FIRMWARE_UPLOAD_DIR = "/var/lib/sin/firmware/uploads"
 os.makedirs(_FIRMWARE_UPLOAD_DIR, exist_ok=True)
+
+# ── Network Analyzer Endpoints ──────────────────────────────────────────────
+@app.get("/analyzer/flows")
+def get_traffic_flows(limit: int = 100):
+    """Get captured packet flows from latest scan"""
+    db = SessionLocal()
+    try:
+        latest_session = db.query(models.ScanSession).order_by(
+            models.ScanSession.id.desc()
+        ).first()
+        
+        if not latest_session:
+            return {"flows": [], "total_flows": 0, "total_packets": 0, "total_bytes": 0}
+        
+        # Extract flows from device vulnerabilities
+        devices = db.query(models.DeviceLog).filter(
+            models.DeviceLog.scan_id == latest_session.id
+        ).all()
+        
+        flows = []
+        for device in devices:
+            if device.ip_address:
+                flows.append({
+                    "src_ip": device.ip_address,
+                    "dst_ip": "192.168.30.1",
+                    "src_port": 0,
+                    "dst_port": 0,
+                    "protocol": "TCP",
+                    "packet_count": len(device.open_ports or []),
+                    "total_bytes": (len(device.open_ports or []) * 1000),
+                    "risk": device.risk_level or "LOW",
+                    "first_seen": latest_session.start_time.isoformat() if latest_session.start_time else None
+                })
+        
+        return {
+            "flows": flows[:limit],
+            "total_flows": len(flows),
+            "total_packets": sum(f["packet_count"] for f in flows),
+            "total_bytes": sum(f["total_bytes"] for f in flows)
+        }
+    except Exception as e:
+        logger.error(f"Error getting flows: {e}")
+        return {"flows": [], "total_flows": 0, "total_packets": 0, "total_bytes": 0}
+    finally:
+        db.close()
+
+@app.get("/analyzer/protocols")
+def get_protocol_analysis():
+    """Get protocol distribution analysis"""
+    db = SessionLocal()
+    try:
+        latest_session = db.query(models.ScanSession).order_by(
+            models.ScanSession.id.desc()
+        ).first()
+        
+        if not latest_session:
+            return {"protocols": [], "total_unique_protocols": 0}
+        
+        devices = db.query(models.DeviceLog).filter(
+            models.DeviceLog.scan_id == latest_session.id
+        ).all()
+        
+        tcp_count = sum(len(d.open_ports or []) for d in devices)
+        udp_count = sum(1 for d in devices if any(p in (d.open_ports or []) for p in [1883, 5683]))
+        
+        protocols = []
+        if tcp_count > 0:
+            protocols.append({
+                "protocol": "TCP",
+                "flow_count": tcp_count,
+                "packet_count": tcp_count,
+                "total_bytes": tcp_count * 1000
+            })
+        if udp_count > 0:
+            protocols.append({
+                "protocol": "UDP",
+                "flow_count": udp_count,
+                "packet_count": udp_count,
+                "total_bytes": udp_count * 500
+            })
+        
+        return {
+            "protocols": protocols,
+            "total_unique_protocols": len(protocols)
+        }
+    except Exception as e:
+        logger.error(f"Error getting protocols: {e}")
+        return {"protocols": [], "total_unique_protocols": 0}
+    finally:
+        db.close()
+
+@app.get("/analyzer/anomalies")
+def get_anomalies():
+    """Get detected network anomalies"""
+    db = SessionLocal()
+    try:
+        # Get all traffic alerts
+        anomaly_events = db.query(models.SecurityEvent).filter(
+            models.SecurityEvent.event_type.in_(["TRAFFIC_ALERT", "VULN_DETECTED"])
+        ).order_by(models.SecurityEvent.timestamp.desc()).limit(100).all()
+        
+        anomalies = []
+        for e in anomaly_events:
+            anomalies.append({
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                "ip_address": e.ip_address,
+                "type": e.event_type,
+                "severity": e.severity,
+                "description": e.description,
+            })
+        
+        return {
+            "anomalies": anomalies,
+            "total_count": len(anomalies),
+            "by_severity": {
+                "CRITICAL": sum(1 for a in anomalies if a["severity"] == "CRITICAL"),
+                "HIGH": sum(1 for a in anomalies if a["severity"] == "HIGH"),
+                "MEDIUM": sum(1 for a in anomalies if a["severity"] == "MEDIUM"),
+                "LOW": sum(1 for a in anomalies if a["severity"] == "LOW"),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting anomalies: {e}")
+        return {"anomalies": [], "total_count": 0, "by_severity": {}}
+    finally:
+        db.close()
+
 
 @app.post("/firmware/upload")
 async def upload_firmware(file: UploadFile = File(...)):

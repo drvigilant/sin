@@ -23,3 +23,6 @@ celery-redbeat==2.2.0
 python-multipart
 python-multipart
 cryptography
+pytest==7.4.4
+pytest-asyncio==0.23.0
+pytest-asyncio==0.23.0
