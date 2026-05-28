@@ -11,6 +11,8 @@ import os
 import redis.asyncio as aioredis
 
 from sin.utils.logger import get_logger
+from sin.shutdown import register_handlers, add_shutdown_hook
+from sin.metrics import instrument_app, inc_scan_triggered, set_agent_up, set_scan_active, record_security_event
 from sin.agent.runner import AgentRunner
 from sin.agent.core import SINAgent
 from sin.agent.packet import PacketSniffer
@@ -21,7 +23,7 @@ logger = get_logger("sin.api.server")
 
 # ── API key auth configuration ──
 _API_KEY        = os.getenv("SIN_API_KEY", "")
-_AUTH_EXEMPT    = {"/health", "/api/health"}
+_AUTH_EXEMPT    = {"/health", "/api/health", "/metrics"}
 
 # ── Shared scan-state via Redis ──
 _SCAN_REDIS_KEY = "sin:scan:running"
@@ -68,6 +70,7 @@ def _set_scan_running(value: bool) -> None:
             pass
 
 app = FastAPI(title="SIN Enterprise API")
+instrument_app(app)
 
 # ── Global Agent Instance ──
 _sin_agent = None
@@ -75,11 +78,47 @@ _packet_sniffer: PacketSniffer | None = None
 
 @app.on_event("startup")
 async def startup_event():
+    register_handlers()   # installs SIGTERM/SIGINT handlers
     global _sin_agent, _packet_sniffer
     _sin_agent = SINAgent()
     _packet_sniffer = PacketSniffer()
     _packet_sniffer.start()
+    set_agent_up(True)
     logger.info("SIN Agent initialized in API context.")
+
+    # Register async cleanup hooks (called on SIGTERM/SIGINT too)
+    async def _stop_packet_sniffer():
+        global _packet_sniffer
+        if _packet_sniffer is not None:
+            try:
+                _packet_sniffer.stop()
+                logger.info("[shutdown] PacketSniffer stopped.")
+            except Exception as exc:
+                logger.warning(f"[shutdown] PacketSniffer stop error: {exc}")
+
+    async def _clear_scan_flag():
+        _set_scan_running(False)
+        logger.info("[shutdown] Scan state flag cleared in Redis.")
+
+    add_shutdown_hook(_stop_packet_sniffer)
+    add_shutdown_hook(_clear_scan_flag)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """FastAPI lifecycle hook - mirrors signal handler path for clean Docker stops."""
+    global _packet_sniffer
+    logger.info("[shutdown] FastAPI shutdown event received – cleaning up resources.")
+    if _packet_sniffer is not None:
+        try:
+            _packet_sniffer.stop()
+            logger.info("[shutdown] PacketSniffer stopped.")
+        except Exception as exc:
+            logger.warning(f"[shutdown] PacketSniffer stop error: {exc}")
+    _set_scan_running(False)
+    set_scan_active(False)
+    set_agent_up(False)
+    logger.info("[shutdown] SIN API shutdown complete.")
 
 app.add_middleware(
     CORSMiddleware,
@@ -235,6 +274,8 @@ def trigger_network_scan(request: ScanRequest, background_tasks: BackgroundTasks
         )
     target = request.subnet or "192.168.30"
     background_tasks.add_task(run_scan_job, target)
+    inc_scan_triggered()
+    set_scan_active(True)
     return {"status": "success", "message": f"Scan dispatched for {target}"}
 
 @app.get("/scan/status")
