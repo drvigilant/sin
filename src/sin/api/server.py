@@ -12,6 +12,7 @@ import redis.asyncio as aioredis
 
 from sin.utils.logger import get_logger
 from sin.shutdown import register_handlers, add_shutdown_hook
+from sin.api.ws_manager import ws_manager
 from sin.metrics import instrument_app, inc_scan_triggered, set_agent_up, set_scan_active, record_security_event
 from sin.agent.runner import AgentRunner
 from sin.agent.packet import PacketSniffer
@@ -77,6 +78,7 @@ _packet_sniffer: PacketSniffer | None = None
 @app.on_event("startup")
 async def startup_event():
     register_handlers()   # installs SIGTERM/SIGINT handlers
+    await ws_manager.startup()
     global _sin_agent, _packet_sniffer
     _packet_sniffer = PacketSniffer()
     _packet_sniffer.start()
@@ -115,6 +117,7 @@ async def shutdown_event():
     _set_scan_running(False)
     set_scan_active(False)
     set_agent_up(False)
+    await ws_manager.shutdown()
     logger.info("[shutdown] SIN API shutdown complete.")
 
 app.add_middleware(
@@ -606,28 +609,8 @@ def list_mitigations():
 
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
-    await websocket.accept()
-    
-    r = aioredis.Redis(
-        host=os.getenv("SIN_REDIS_HOST", "redis"),
-        port=int(os.getenv("SIN_REDIS_PORT", "6379")),
-        password=os.getenv("SIN_REDIS_PASSWORD", ""),
-        decode_responses=True
-    )
-    pubsub = r.pubsub()
-    await pubsub.subscribe("sin:ws:stream")
-    
-    try:
-        while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            if message:
-                await websocket.send_json(json.loads(message["data"]))
-            await asyncio.sleep(0.2)
-    except (WebSocketDisconnect, asyncio.CancelledError):
-        pass
-    finally:
-        await pubsub.unsubscribe("sin:ws:stream")
-        await r.close()
+    """Single-line handler — ws_manager owns all connection lifecycle."""
+    await ws_manager.connect(websocket)
 
 # ── Firmware Analysis Endpoints ──────────────────────────────────────────────
 import shutil
