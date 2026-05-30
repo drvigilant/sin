@@ -78,6 +78,9 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - SIN_GATEWAY_IP=192.168.30.1
       - DRY_RUN=false
+      - SIN_JWT_SECRET=${SIN_JWT_SECRET}
+      - SIN_ADMIN_USER=${SIN_ADMIN_USER:-admin}
+      - SIN_ADMIN_PASS=${SIN_ADMIN_PASS:-sinisboom}
     restart: unless-stopped
     networks:
       - sin_internal

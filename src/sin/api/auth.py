@@ -31,7 +31,7 @@ bearer   = HTTPBearer(auto_error=False)
 
 # ── Password ──────────────────────────────────────────────────────────────────
 def hash_password(plain: str) -> str:
-    return pwd_ctx.hash(plain)
+    return pwd_ctx.hash(plain[:72])
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_ctx.verify(plain, hashed)

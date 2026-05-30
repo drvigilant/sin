@@ -415,10 +415,12 @@ tbody .sev-INFO { color: var(--text3); }
         <div style="font-size:9px;color:var(--text3);letter-spacing:0.1em;">SHADOWS IN THE NETWORK</div>
       </div>
     </div>
-    <div class="auth-subtitle">Enter your API key to access the SIN security console. This is the value of <code style="color:var(--accent)">SIN_API_KEY</code> in your deployment.</div>
-    <label class="auth-label">API Key</label>
-    <input class="auth-input" id="key-input" type="password" placeholder="sin_xxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-    <button class="auth-btn" id="key-submit">Authenticate &rarr;</button>
+    <div class="auth-subtitle">Sign in to the SIN security console with your operator credentials.</div>
+    <label class="auth-label">Username</label>
+    <input class="auth-input" id="auth-user" type="text" placeholder="admin" autocomplete="username">
+    <label class="auth-label">Password</label>
+    <input class="auth-input" id="auth-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="auth-btn" id="key-submit">Sign In &rarr;</button>
     <div class="auth-error" id="key-err"></div>
   </div>
 </div>
@@ -789,7 +791,9 @@ tbody .sev-INFO { color: var(--text3); }
 
 <script>
 const API='/api', WS_PATH='/ws/events';
-let API_KEY=localStorage.getItem('sin_api_key')||'';
+let API_KEY='';
+let JWT_TOKEN=localStorage.getItem('sin_jwt')||'';
+let REFRESH_TOKEN=localStorage.getItem('sin_refresh')||'';
 let ws=null, scanPoll=null;
 let devices=[], flowBuf=[], anomBuf=[];
 let sortField='risk_score', sortDir=-1, riskFilter='all';
@@ -822,8 +826,17 @@ tick(); setInterval(tick,1000);
 
 // API
 async function api(path,opts={}){
-  const r=await fetch(API+path,{headers:{'X-API-Key':API_KEY,'Content-Type':'application/json',...(opts.headers||{})},...opts});
-  if(r.status===401){showAuth('Invalid API key.');throw new Error('401');}
+  const r=await fetch(API+path,{headers:{'Authorization':'Bearer '+JWT_TOKEN,'Content-Type':'application/json',...(opts.headers||{})},...opts});
+  if(r.status===401){
+    if(REFRESH_TOKEN){
+      try{
+        const rr=await fetch(API+'/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:REFRESH_TOKEN})});
+        if(rr.ok){const d=await rr.json();JWT_TOKEN=d.access_token;REFRESH_TOKEN=d.refresh_token;localStorage.setItem('sin_jwt',JWT_TOKEN);localStorage.setItem('sin_refresh',REFRESH_TOKEN);return api(path,opts);}
+      }catch(e){}
+    }
+    JWT_TOKEN='';REFRESH_TOKEN='';localStorage.removeItem('sin_jwt');localStorage.removeItem('sin_refresh');
+    showAuth('Session expired. Please sign in.');throw new Error('401');
+  }
   return r.json();
 }
 
@@ -831,17 +844,23 @@ async function api(path,opts={}){
 function showAuth(msg=''){document.getElementById('key-overlay').classList.remove('hidden');if(msg)document.getElementById('key-err').textContent=msg;}
 function hideAuth(){document.getElementById('key-overlay').classList.add('hidden');}
 document.getElementById('key-submit').addEventListener('click',async()=>{
-  const k=document.getElementById('key-input').value.trim();
-  if(!k){document.getElementById('key-err').textContent='Key cannot be empty.';return;}
+  const u=document.getElementById('auth-user').value.trim();
+  const p=document.getElementById('auth-pass').value;
+  if(!u||!p){document.getElementById('key-err').textContent='Username and password required.';return;}
   const btn=document.getElementById('key-submit');
-  btn.textContent='Verifying...'; btn.disabled=true;
+  btn.textContent='Signing in...'; btn.disabled=true;
   try{
-    const r=await fetch(API+'/health',{headers:{'X-API-Key':k}});
-    if(r.status===401){document.getElementById('key-err').textContent='Invalid API key.';btn.textContent='Authenticate →';btn.disabled=false;return;}
-    API_KEY=k; localStorage.setItem('sin_api_key',k); hideAuth(); init();
-  }catch(e){document.getElementById('key-err').textContent='Cannot reach SIN engine.';btn.textContent='Authenticate →';btn.disabled=false;}
+    const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const data=await r.json();
+    if(r.status===401||r.status===403){document.getElementById('key-err').textContent=data.detail||'Invalid credentials.';btn.textContent='Sign In →';btn.disabled=false;return;}
+    JWT_TOKEN=data.access_token;
+    REFRESH_TOKEN=data.refresh_token;
+    localStorage.setItem('sin_jwt',JWT_TOKEN);
+    localStorage.setItem('sin_refresh',REFRESH_TOKEN);
+    hideAuth(); init();
+  }catch(e){document.getElementById('key-err').textContent='Cannot reach SIN engine.';btn.textContent='Sign In →';btn.disabled=false;}
 });
-document.getElementById('key-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('key-submit').click();});
+document.getElementById('auth-pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('key-submit').click();});
 
 // Nav
 document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
@@ -867,7 +886,12 @@ async function init(){
   setInterval(loadStats,15000);
   setInterval(()=>loadDevices(false),90000); // longer interval, won't wipe on scan
 }
-if(API_KEY)init(); else showAuth();
+if(JWT_TOKEN){
+  // Validate token is still alive before trusting it
+  fetch(API+'/auth/me',{headers:{'Authorization':'Bearer '+JWT_TOKEN}})
+    .then(r=>{if(r.ok){init();}else{JWT_TOKEN='';REFRESH_TOKEN='';localStorage.removeItem('sin_jwt');localStorage.removeItem('sin_refresh');showAuth('Session expired. Please sign in.');}})
+    .catch(()=>showAuth());
+} else showAuth();
 
 // Stats
 async function loadStats(){
@@ -998,7 +1022,7 @@ async function toggleQuar(btn){
   const ip=btn.dataset.ip,iso=btn.dataset.iso==='true';
   btn.disabled=true;
   try{
-    if(iso){await api(`/agent/lift/${ip}`,{method:'POST'});}
+    if(iso){await api(`/agent/isolate/${ip}`,{method:'DELETE'});}
     else{await api(`/agent/isolate/${ip}`,{method:'POST'});}
     setTimeout(loadDevices,1500);
   }catch(e){if(e.message!=='401')console.error(e);}
@@ -1461,7 +1485,7 @@ async function fwUpload(){
     form.append('file', fwFile);
     const r = await fetch(API + '/firmware/upload', {
       method: 'POST',
-      headers: {'X-API-Key': API_KEY},
+      headers: {'Authorization': 'Bearer ' + JWT_TOKEN},
       body: form
     });
     if(r.status === 401){showAuth('Session expired.');return;}

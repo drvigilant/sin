@@ -94,6 +94,37 @@ def _apply_migrations() -> None:
                     conn.rollback()
 
 
+
+
+def _seed_admin() -> None:
+    """Create default admin user on first startup if no users exist."""
+    import os
+    from sin.storage.database import SessionLocal
+    from sin.storage.models import User
+    from sin.api.auth import hash_password
+
+    username = os.getenv("SIN_ADMIN_USER", "admin")
+    password = os.getenv("SIN_ADMIN_PASS", "sinisboom")
+
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            db.add(User(
+                username=username,
+                hashed_password=hash_password(password),
+                role="admin",
+                is_active="true",
+            ))
+            db.commit()
+            logger.info(f"Admin user seeded: {username}")
+        else:
+            logger.debug("Users already exist — skipping seed")
+    except Exception as exc:
+        logger.warning(f"Admin seed failed: {exc}")
+        db.rollback()
+    finally:
+        db.close()
+
 def init_db() -> None:
     """
     Create all tables (new installs) then apply column migrations (upgrades).
@@ -108,6 +139,9 @@ def init_db() -> None:
         # Step 2 — add new columns to existing tables
         _apply_migrations()
         logger.info("Column migrations applied.")
+
+        # Step 3 — seed default admin
+        _seed_admin()
 
     except Exception as exc:
         logger.critical(f"Database initialisation failed: {exc}")

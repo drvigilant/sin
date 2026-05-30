@@ -23,7 +23,7 @@ logger = get_logger("sin.api.server")
 
 # ── API key auth configuration ──
 _API_KEY        = os.getenv("SIN_API_KEY", "")
-_AUTH_EXEMPT    = {"/health", "/api/health", "/metrics"}
+_AUTH_EXEMPT    = {"/health", "/api/health", "/metrics", "/auth/login", "/auth/refresh", "/auth/logout", "/docs", "/openapi.json"}
 
 # ── Shared scan-state via Redis ──
 _SCAN_REDIS_KEY = "sin:scan:running"
@@ -133,12 +133,24 @@ async def api_key_middleware(request: Request, call_next):
         return await call_next(request)
 
     if _API_KEY:
+        # Accept valid API key (worker/beat/curl)
         provided = request.headers.get("X-API-Key", "")
-        if provided != _API_KEY:
-            return JSONResponse(
-                status_code=401,
-                content={"error": "Unauthorized", "detail": "Missing or invalid X-API-Key header"},
-            )
+        if provided == _API_KEY:
+            return await call_next(request)
+        # Accept valid JWT Bearer token (browser)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                from sin.api.auth import decode_token
+                payload = decode_token(auth_header[7:])
+                if payload.get("type") == "access":
+                    return await call_next(request)
+            except Exception:
+                pass
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Unauthorized", "detail": "Missing or invalid X-API-Key header"},
+        )
     return await call_next(request)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
