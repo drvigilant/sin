@@ -14,7 +14,6 @@ from sin.utils.logger import get_logger
 from sin.shutdown import register_handlers, add_shutdown_hook
 from sin.metrics import instrument_app, inc_scan_triggered, set_agent_up, set_scan_active, record_security_event
 from sin.agent.runner import AgentRunner
-from sin.agent.core import SINAgent
 from sin.agent.packet import PacketSniffer
 from sin.storage.database import SessionLocal
 from sin.storage import models
@@ -73,14 +72,12 @@ app = FastAPI(title="SIN Enterprise API")
 instrument_app(app)
 
 # ── Global Agent Instance ──
-_sin_agent = None
 _packet_sniffer: PacketSniffer | None = None
 
 @app.on_event("startup")
 async def startup_event():
     register_handlers()   # installs SIGTERM/SIGINT handlers
     global _sin_agent, _packet_sniffer
-    _sin_agent = SINAgent()
     _packet_sniffer = PacketSniffer()
     _packet_sniffer.start()
     set_agent_up(True)
@@ -574,8 +571,6 @@ async def ollama_status():
 
 @app.get("/agent/status")
 def agent_status():
-    if _sin_agent is None:
-        return {"running": False, "note": "SINAgent not started"}
     return {"running": True}
 
 @app.post("/agent/isolate/{ip}")
@@ -588,13 +583,15 @@ def isolate_device(ip: str, db: Session = Depends(get_db)):
     from sin.tasks.celery_app import celery_app as _celery
     mac = device.mac_address or "unknown"
     task = _celery.send_task("quarantine_device", args=[ip, mac])
-    _sin_agent.registry.mark_mitigated(ip)
+    from sin.storage.registry import DeviceRegistry
+    _reg = DeviceRegistry()
+    _reg.mark_mitigated(ip)
     return {"status": "queued", "ip": ip, "task_id": task.id, "mac": mac}
 
 @app.post("/agent/whitelist/{ip}")
 def whitelist_device(ip: str):
-    if _sin_agent is None: raise HTTPException(503, "Agent not running")
-    _sin_agent.whitelist_device(ip)
+    from sin.storage.registry import DeviceRegistry
+    DeviceRegistry().whitelist(ip)
     return {"status": "whitelisted", "ip": ip}
 
 @app.delete("/agent/isolate/{ip}")
@@ -605,7 +602,7 @@ def lift_device(ip: str):
 
 @app.get("/agent/mitigations")
 def list_mitigations():
-    return [] if _sin_agent is None else _sin_agent.mitigation.list_active()
+    return []
 
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
