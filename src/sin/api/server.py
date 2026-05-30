@@ -457,38 +457,53 @@ async def ai_audit(request: OllamaAuditRequest):
         import re
         return re.sub(r"[^\w.\-:/ ]", "", str(val or "Unknown"))[:max_len]
 
-    prompt = f"""You are an expert IoT penetration tester and SOC analyst specialising in CCTV and embedded device security.
+    # Build strict port-grounded context
+    port_context = []
+    for p in open_ports:
+        svc = {554:"RTSP (unauthenticated video stream)", 34567:"Xiongmai/DVR SDK (CVE-2018-10088 surface)", 37777:"Dahua SDK", 8000:"Hikvision HTTP", 80:"HTTP management", 443:"HTTPS", 23:"Telnet (UNENCRYPTED)", 21:"FTP (UNENCRYPTED)", 22:"SSH", 1883:"MQTT", 8080:"HTTP-Alt", 8554:"RTSP-Alt"}.get(p, f"Unknown service on port {p}")
+        port_context.append(f"  - Port {p}: {svc}")
+    port_lines = "\n".join(port_context) if port_context else "  (none detected)"
 
-Perform a full security assessment on this device and return a JSON array of findings.
+    known_vuln_summary = ", ".join([v.get("cve") or v.get("type","?") for v in vulns]) if vulns else "none"
 
-Device Context:
-- IP Address: {_s(request.ip_address)}
-- MAC Address: {_s(mac)}
+    prompt = f"""You are an expert IoT penetration tester. Analyse this device and return ONLY confirmed findings.
+
+STRICT RULES — violations will cause the report to be rejected:
+- ONLY report findings for services on ports that appear in the CONFIRMED OPEN PORTS list below.
+- Do NOT mention Telnet, FTP, SSH, or any other port unless it is in the confirmed list.
+- Do NOT infer or assume any service that is not confirmed.
+- Do NOT repeat findings already listed in Known Vulnerabilities.
+- Every finding MUST reference a specific confirmed port number.
+
+Device:
+- IP: {_s(request.ip_address)}
 - Vendor: {_s(vendor)}
 - Model: {_s(model_name)}
-- Device Type: {_s(device_type)}
-- Firmware Version: {_s(firmware)}
-- Serial Number: {_s(serial)}
-- Open Ports: {open_ports}
-- OS Family: {_s(request.os_family or 'Embedded Linux')}
-- Known Vulnerabilities Already Detected: {json.dumps(vulns)}
+- Firmware: {_s(firmware)}
+- Serial: {_s(serial)}
+- MAC: {_s(mac)}
 
-Your tasks:
-1. Identify all security risks based on open ports, firmware version, and vendor
-2. Check if the firmware version appears outdated or vulnerable
-3. Identify default credential risks specific to this vendor and model
-4. Flag unencrypted protocol exposure (RTSP on 554, Telnet on 23, FTP on 21, HTTP on 80)
-5. Suggest specific CVEs relevant to this vendor/firmware
-6. Provide concrete remediation steps
+CONFIRMED OPEN PORTS (analyse ONLY these):
+{port_lines}
 
-Return ONLY a JSON array. No markdown, no explanation, no text outside the array:
+Known Vulnerabilities Already Detected (do NOT repeat these):
+  {known_vuln_summary}
+
+Tasks (only for confirmed ports above):
+1. Identify CVEs specific to this vendor/model/firmware version
+2. Flag authentication weaknesses on confirmed ports
+3. Identify firmware version vulnerabilities with CVE numbers
+4. Rate each finding with realistic CVSS-based severity
+
+Return ONLY a valid JSON array. No markdown fences, no explanation:
 [
   {{
     "severity": "CRITICAL|HIGH|MEDIUM|LOW",
     "type": "category name",
     "cve": "CVE-XXXX-XXXXX or empty string",
-    "description": "specific technical finding",
-    "remediation": ["step 1", "step 2"]
+    "port": port_number_integer_or_null,
+    "description": "specific technical finding referencing confirmed data",
+    "remediation": ["concrete step 1", "concrete step 2"]
   }}
 ]"""
 
@@ -761,3 +776,123 @@ async def firmware_results(filename: str):
     for root, _, fs in os.walk(path):
         files.extend(fs)
     return {"filename": filename, "file_count": len(files), "path": path}
+
+
+# ── AUTH ENDPOINTS ────────────────────────────────────────────────────────────
+from pydantic import BaseModel as _BM
+from sin.api.auth import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token, decode_token,
+    get_user_by_username, get_user_by_id, get_current_user,
+    require_admin, require_analyst
+)
+from sin.storage import models as _m
+from jose import JWTError
+import hashlib as _hl
+
+class LoginRequest(_BM):
+    username: str
+    password: str
+
+class RefreshRequest(_BM):
+    refresh_token: str
+
+@app.post("/auth/login")
+def auth_login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = get_user_by_username(db, req.username)
+    if not user or not verify_password(req.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.is_active != "true":
+        raise HTTPException(status_code=403, detail="Account disabled")
+
+    access  = create_access_token(user.id, user.username, user.role)
+    refresh = create_refresh_token(user.id)
+
+    # Store hashed refresh token
+    from datetime import datetime, timedelta, timezone
+    expires = datetime.now(timezone.utc) + timedelta(days=7)
+    db.add(_m.RefreshToken(
+        user_id    = user.id,
+        token_hash = _hl.sha256(refresh.encode()).hexdigest(),
+        expires_at = expires,
+    ))
+    user.last_login = datetime.utcnow()
+    db.commit()
+
+    return {
+        "access_token":  access,
+        "refresh_token": refresh,
+        "token_type":    "bearer",
+        "expires_in":    1800,
+        "user": {"id": user.id, "username": user.username, "role": user.role}
+    }
+
+@app.post("/auth/refresh")
+def auth_refresh(req: RefreshRequest, db: Session = Depends(get_db)):
+    try:
+        payload = decode_token(req.refresh_token)
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user_id = int(payload["sub"])
+    except (JWTError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    token_hash = _hl.sha256(req.refresh_token.encode()).hexdigest()
+    stored = db.query(_m.RefreshToken).filter(
+        _m.RefreshToken.token_hash == token_hash,
+        _m.RefreshToken.revoked    == "false",
+    ).first()
+    if not stored:
+        raise HTTPException(status_code=401, detail="Token revoked or not found")
+
+    user = get_user_by_id(db, user_id)
+    if not user or user.is_active != "true":
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Rotate — revoke old, issue new
+    stored.revoked = "true"
+    from datetime import datetime, timedelta, timezone
+    new_refresh = create_refresh_token(user.id)
+    db.add(_m.RefreshToken(
+        user_id    = user.id,
+        token_hash = _hl.sha256(new_refresh.encode()).hexdigest(),
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7),
+    ))
+    db.commit()
+
+    return {
+        "access_token":  create_access_token(user.id, user.username, user.role),
+        "refresh_token": new_refresh,
+        "token_type":    "bearer",
+        "expires_in":    1800,
+    }
+
+@app.post("/auth/logout")
+def auth_logout(req: RefreshRequest, db: Session = Depends(get_db)):
+    token_hash = _hl.sha256(req.refresh_token.encode()).hexdigest()
+    stored = db.query(_m.RefreshToken).filter(
+        _m.RefreshToken.token_hash == token_hash
+    ).first()
+    if stored:
+        stored.revoked = "true"
+        db.commit()
+    return {"status": "logged_out"}
+
+@app.get("/auth/me")
+def auth_me(user: _m.User = Depends(get_current_user)):
+    return {"id": user.id, "username": user.username, "role": user.role, "last_login": user.last_login}
+
+@app.get("/auth/users", dependencies=[Depends(require_admin)])
+def list_users(db: Session = Depends(get_db)):
+    users = db.query(_m.User).all()
+    return [{"id": u.id, "username": u.username, "role": u.role, "is_active": u.is_active, "last_login": u.last_login} for u in users]
+
+@app.post("/auth/users", dependencies=[Depends(require_admin)])
+def create_user(username: str, password: str, role: str = "analyst", db: Session = Depends(get_db)):
+    if get_user_by_username(db, username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    if role not in ("admin", "analyst", "viewer"):
+        raise HTTPException(status_code=400, detail="Role must be admin, analyst, or viewer")
+    user = _m.User(username=username, hashed_password=hash_password(password), role=role)
+    db.add(user); db.commit(); db.refresh(user)
+    return {"id": user.id, "username": user.username, "role": user.role}

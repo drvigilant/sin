@@ -47,6 +47,26 @@ class AuditEngine:
 
         logger.info(f"🔎 Brain conducting deep heuristic audit for {ip} [{mfr}]...")
 
+        # --- 🛡️ LAYER 0: HTTP FINGERPRINTING (runs before ONVIF — always gets something) ---
+        try:
+            from sin.scanner.http_fingerprint import fingerprint as http_fp
+            fp = http_fp(ip, list(ports))
+            if fp:
+                # Only fill gaps — never overwrite data the Go scanner already found
+                for field, val in fp.items():
+                    cur = device_data.get(field, "")
+                    if not cur or cur.lower() in ("unknown", ""):
+                        device_data[field] = val
+                # Sync manufacturer/vendor — they're aliases
+                if device_data.get("vendor") and not device_data.get("manufacturer"):
+                    device_data["manufacturer"] = device_data["vendor"]
+                if device_data.get("manufacturer") and not device_data.get("vendor"):
+                    device_data["vendor"] = device_data["manufacturer"]
+                mfr = (device_data.get("manufacturer") or "").lower()
+                logger.info(f"[fingerprint] {ip} enriched → vendor={device_data.get('vendor')} model={device_data.get('model')} fw={device_data.get('firmware')}")
+        except Exception as e:
+            logger.debug(f"HTTP fingerprint error for {ip}: {e}")
+
         # --- 🛡️ LAYER 1: DEEP ACTIVE INTERROGATION (ONVIF/ISAPI) ---
         try:
             from sin.scanner.onvif_intel import onvif_prober
@@ -100,20 +120,41 @@ class AuditEngine:
             risk_score += 70
 
         # 5. CCTV / NVR Specific
-        if "xiongmai" in mfr or "h264dvr" in banners:
-            if 34567 in ports:
-                vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": "Xiongmai DVR service unauthenticated."})
-                risk_score += 90
-        if "hikvision" in mfr or "hikvision-httppreview" in banners:
+        # Port 34567 IS the Xiongmai/generic DVR SDK port — trigger CVE regardless of vendor label
+        if 34567 in ports:
+            vuln_desc = "Xiongmai/generic DVR SDK port open. Unauthenticated remote code execution surface (CVE-2018-10088). This port is used by Xiongmai, XMeye, Sofia, and hundreds of white-label OEM cameras."
+            vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": vuln_desc, "port": 34567})
+            risk_score += 90
+        elif "xiongmai" in mfr or "h264dvr" in banners or "sofia" in banners:
+            vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": "Xiongmai-based firmware detected. Unauthenticated RCE surface.", "port": 34567})
+            risk_score += 90
+
+        # Hikvision — port 8000 OR port 80 with Hikvision banner
+        if "hikvision" in mfr or "hikvision-httppreview" in banners or "hikvision" in banners:
             if 8000 in ports or 80 in ports:
-                vulnerabilities.append({"severity": "CRITICAL", "type": "Backdoor Access", "cve": "CVE-2017-7921", "description": "Potential Hikvision backdoor."})
+                vulnerabilities.append({"severity": "CRITICAL", "type": "Backdoor Access", "cve": "CVE-2017-7921", "description": "Hikvision ISAPI authentication bypass. Unauthenticated access to device configuration and stream.", "port": 8000 if 8000 in ports else 80})
                 risk_score += 85
-        if "dahua" in mfr or 37777 in ports:
-            vulnerabilities.append({"severity": "HIGH", "type": "Credential Leak", "cve": "CVE-2021-33044", "description": "Dahua auth bypass vulnerability."})
+
+        # Dahua — port 37777 IS the Dahua SDK port
+        if 37777 in ports:
+            vulnerabilities.append({"severity": "HIGH", "type": "Credential Leak", "cve": "CVE-2021-33044", "description": "Dahua SDK port open. Authentication bypass allows credential extraction.", "port": 37777})
             risk_score += 75
+        elif "dahua" in mfr:
+            vulnerabilities.append({"severity": "HIGH", "type": "Credential Leak", "cve": "CVE-2021-33044", "description": "Dahua device — authentication bypass vulnerability.", "port": None})
+            risk_score += 75
+
         if 554 in ports or 8554 in ports:
-            vulnerabilities.append({"severity": "HIGH", "type": "Privacy Leak (RTSP)", "description": "Unencrypted video stream detected."})
+            p = 554 if 554 in ports else 8554
+            vulnerabilities.append({"severity": "HIGH", "type": "Privacy Leak (RTSP)", "description": f"Unencrypted RTSP video stream on port {p}. No authentication required to view camera feed.", "port": p})
             risk_score += 50
+
+        # HTTP management panel exposed
+        if 80 in ports and 34567 not in ports:  # don't double-count
+            vulnerabilities.append({"severity": "MEDIUM", "type": "Unencrypted Management", "description": "HTTP management interface exposed on port 80. Credentials transmitted in cleartext.", "port": 80})
+            risk_score += 20
+        elif 80 in ports:
+            vulnerabilities.append({"severity": "MEDIUM", "type": "Unencrypted Management", "description": "HTTP management interface on port 80. Credentials in cleartext.", "port": 80})
+            risk_score += 20
 
         # 6. ICS / OT Risks
         if 502 in ports or 47808 in ports:

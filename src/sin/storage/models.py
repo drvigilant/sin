@@ -133,3 +133,27 @@ class SecurityEvent(Base):
     severity    = Column(String)    # INFO | WARNING | CRITICAL
     description = Column(Text)      # Changed String → Text for long CVE descriptions
     timestamp   = Column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    username      = Column(String, unique=True, index=True, nullable=False)
+    email         = Column(String, unique=True, index=True, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    role          = Column(String, default="analyst")   # admin | analyst | viewer
+    is_active     = Column(String, default="true")
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    last_login    = Column(DateTime, nullable=True)
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    revoked    = Column(String, default="false")
+    created_at = Column(DateTime, default=datetime.utcnow)
