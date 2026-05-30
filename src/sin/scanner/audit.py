@@ -72,7 +72,8 @@ class AuditEngine:
             from sin.scanner.onvif_intel import onvif_prober
             onvif_data = onvif_prober.probe(ip, list(ports))
             if onvif_data:
-                if onvif_data.get("manufacturer"): device_data["manufacturer"] = onvif_data["manufacturer"].strip()
+                # Do NOT override brand vendor with OEM manufacturer (e.g. Xiongmai inside Securus)
+            # if onvif_data.get("manufacturer"): device_data["manufacturer"] = onvif_data["manufacturer"].strip()
                 if onvif_data.get("model"): device_data["model"] = onvif_data["model"].strip()
                 if onvif_data.get("firmware"): device_data["firmware"] = onvif_data["firmware"].strip()
                 if onvif_data.get("mac_address"): device_data["mac_address"] = onvif_data["mac_address"].strip()
@@ -126,8 +127,8 @@ class AuditEngine:
             vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": vuln_desc, "port": 34567})
             risk_score += 90
         elif "xiongmai" in mfr or "h264dvr" in banners or "sofia" in banners:
-            vulnerabilities.append({"severity": "CRITICAL", "type": "Remote Code Execution", "cve": "CVE-2018-10088", "description": "Xiongmai-based firmware detected. Unauthenticated RCE surface.", "port": 34567})
-            risk_score += 90
+            # Only flag RCE if port 34567 is confirmed open — banner alone is insufficient evidence
+            pass
 
         # Hikvision — port 8000 OR port 80 with Hikvision banner
         if "hikvision" in mfr or "hikvision-httppreview" in banners or "hikvision" in banners:
@@ -148,12 +149,9 @@ class AuditEngine:
             vulnerabilities.append({"severity": "HIGH", "type": "Privacy Leak (RTSP)", "description": f"Unencrypted RTSP video stream on port {p}. No authentication required to view camera feed.", "port": p})
             risk_score += 50
 
-        # HTTP management panel exposed
-        if 80 in ports and 34567 not in ports:  # don't double-count
+        # HTTP management panel exposed — score once only
+        if 80 in ports:
             vulnerabilities.append({"severity": "MEDIUM", "type": "Unencrypted Management", "description": "HTTP management interface exposed on port 80. Credentials transmitted in cleartext.", "port": 80})
-            risk_score += 20
-        elif 80 in ports:
-            vulnerabilities.append({"severity": "MEDIUM", "type": "Unencrypted Management", "description": "HTTP management interface on port 80. Credentials in cleartext.", "port": 80})
             risk_score += 20
 
         # 6. ICS / OT Risks
