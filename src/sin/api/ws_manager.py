@@ -35,7 +35,7 @@ import os
 from datetime import datetime, timezone
 from typing import Set
 
-import aioredis
+import redis.asyncio as aioredis
 import redis as _sync_redis
 from fastapi import WebSocket, WebSocketDisconnect
 from sin.utils.logger import get_logger
