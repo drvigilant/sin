@@ -1,158 +1,126 @@
 """
 sin.scanner.onvif_intel
 ═══════════════════════
-Authenticated ONVIF probing with credential vault fallback.
-Tries unauthenticated first, then WS-Security digest auth.
+Unauthenticated ONVIF GetDeviceInformation prober.
+
+Confirmed working against Securus/Xiongmai cameras on 192.168.30.x:
+  - Port 80  → cameras: .3, .4, .12, .13, .27
+  - Port 8899 → cameras: .5, .22
+  - Content-Type MUST be application/soap+xml (not text/xml)
+  - No authentication required — cameras respond to bare SOAP envelope
 """
+
 import urllib.request
 import urllib.error
-import hashlib
-import base64
-import os
 import re
-from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from sin.utils.logger import get_logger
 
 logger = get_logger("sin.scanner.onvif_intel")
 
-INFO_PAYLOAD_TMPL = """<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
-            xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
-            xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
-  <s:Header>{auth_header}</s:Header>
-  <s:Body>
-    <GetDeviceInformation xmlns="http://www.onvif.org/ver10/device/wsdl"/>
-  </s:Body>
-</s:Envelope>"""
+# Minimal unauthenticated ONVIF envelope — no WS-Security header needed
+DEVICE_INFO_PAYLOAD = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">'
+    '<s:Body>'
+    '<GetDeviceInformation xmlns="http://www.onvif.org/ver10/device/wsdl"/>'
+    '</s:Body>'
+    '</s:Envelope>'
+)
 
-NET_PAYLOAD_TMPL = """<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
-            xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
-            xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
-  <s:Header>{auth_header}</s:Header>
-  <s:Body>
-    <GetNetworkInterfaces xmlns="http://www.onvif.org/ver10/device/wsdl"/>
-  </s:Body>
-</s:Envelope>"""
+# Ports to try in order — confirmed from live camera probing
+ONVIF_PORTS = [80, 8899, 8080, 8000]
 
 
-def _build_auth_header(username: str, password: str) -> str:
-    nonce_bytes = os.urandom(16)
-    nonce_b64 = base64.b64encode(nonce_bytes).decode()
-    created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    digest_raw = hashlib.sha1(
-        nonce_bytes + created.encode() + password.encode()
-    ).digest()
-    digest_b64 = base64.b64encode(digest_raw).decode()
-    return f"""<wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
-               xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
-  <wsse:UsernameToken>
-    <wsse:Username>{username}</wsse:Username>
-    <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">{digest_b64}</wsse:Password>
-    <wsse:Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary">{nonce_b64}</wsse:Nonce>
-    <wsu:Created>{created}</wsu:Created>
-  </wsse:UsernameToken>
-</wsse:Security>"""
-
-
-def _send_soap(url: str, payload: str, timeout: int = 5) -> Optional[str]:
+def _send_onvif(ip: str, port: int, timeout: int = 4) -> Optional[str]:
+    """Send unauthenticated ONVIF GetDeviceInformation. Returns raw XML or None."""
+    url = f"http://{ip}:{port}/onvif/device_service"
     try:
         req = urllib.request.Request(
             url,
-            data=payload.encode("utf-8"),
+            data=DEVICE_INFO_PAYLOAD.encode("utf-8"),
             headers={
-                "Content-Type": "text/xml; charset=utf-8",
-                "User-Agent": "SIN-EDR/4.0",
+                # Must be application/soap+xml — text/xml causes HTTP 200 with HTML 404 body
+                "Content-Type": "application/soap+xml",
+                "User-Agent":   "SIN-EDR/4.0",
             },
+            method="POST",
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
-                return resp.read().decode("utf-8", errors="ignore")
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            return "401"
+                body = resp.read().decode("utf-8", errors="ignore")
+                # Verify it's actually an ONVIF response not an HTML error page
+                if "Manufacturer" in body or "GetDeviceInformationResponse" in body:
+                    return body
     except Exception:
         pass
     return None
 
 
-def _extract_xml(xml_string: str, tag: str) -> str:
-    match = re.search(f"<{tag}[^>]*>(.*?)</{tag}>", xml_string, re.IGNORECASE)
-    if not match:
-        match = re.search(
-            f"<[^>]+:{tag}[^>]*>(.*?)</[^>]+:{tag}>", xml_string, re.IGNORECASE
-        )
-    return match.group(1).strip() if match else ""
+def _extract(xml: str, tag: str) -> str:
+    """Extract tag value handling both prefixed and unprefixed tags."""
+    # Try tds:Tag first, then any namespace prefix, then bare tag
+    for pattern in [
+        f"<tds:{tag}>(.*?)</tds:{tag}>",
+        f"<[^>]+:{tag}[^>]*>(.*?)</[^>]+:{tag}>",
+        f"<{tag}[^>]*>(.*?)</{tag}>",
+    ]:
+        m = re.search(pattern, xml, re.IGNORECASE | re.DOTALL)
+        if m:
+            return m.group(1).strip()
+    return ""
 
 
 class ONVIFProber:
-    TIMEOUT = 5
+    """
+    Probe a camera for device information via unauthenticated ONVIF.
+    Tries ONVIF_PORTS in order, returns first successful result.
+    """
+
+    TIMEOUT = 4
 
     def probe(self, ip: str, open_ports: List[int]) -> Dict[str, str]:
-        candidates = [p for p in [80, 8080, 8899, 8000] if p in open_ports] or [80]
+        """
+        Returns dict with manufacturer, model, firmware, serial, mac_address.
+        Returns {} if camera does not respond to ONVIF on any port.
+        """
+        # Only try ports that are actually open on this device
+        candidates = [p for p in ONVIF_PORTS if p in open_ports]
+        # Always try at least port 80 as fallback
+        if not candidates:
+            candidates = [80]
+
         for port in candidates:
-            url = f"http://{ip}:{port}/onvif/device_service"
-            result = self._probe_url(url, ip)
-            if result:
-                return result
-        return {}
-
-    def _probe_url(self, url: str, ip: str) -> Dict[str, str]:
-        # Try unauthenticated first
-        result = self._fetch_device_info(url, auth_header="")
-        if result and result != "401":
-            return result
-
-        # Auth required — pull from vault
-        try:
-            from sin.storage.credential_vault import vault
-            creds = vault.get_for_device(ip)
-        except Exception:
-            creds = []
-
-        for cred in creds:
-            auth = _build_auth_header(cred["username"], cred["password"])
-            result = self._fetch_device_info(url, auth_header=auth)
-            if result and result != "401":
-                try:
-                    from sin.storage.credential_vault import vault
-                    vault.mark_success(cred["id"], ip)
-                except Exception:
-                    pass
-                logger.info(f"ONVIF auth success on {ip} with user={cred['username']}")
-                return result
+            xml = _send_onvif(ip, port, self.TIMEOUT)
+            if xml:
+                result = self._parse(xml, ip, port)
+                if result:
+                    return result
 
         return {}
 
-    def _fetch_device_info(self, url: str, auth_header: str):
-        info_payload = INFO_PAYLOAD_TMPL.format(auth_header=auth_header)
-        resp = _send_soap(url, info_payload, self.TIMEOUT)
+    def _parse(self, xml: str, ip: str, port: int) -> Dict[str, str]:
+        manufacturer = _extract(xml, "Manufacturer")
+        model        = _extract(xml, "Model")
+        firmware     = _extract(xml, "FirmwareVersion")
+        serial       = _extract(xml, "SerialNumber")
+        hardware_id  = _extract(xml, "HardwareId")
 
-        if resp == "401":
-            return "401"
-        if not resp:
+        if not manufacturer and not firmware:
             return {}
 
-        data = {
-            "manufacturer": _extract_xml(resp, "Manufacturer"),
-            "model":        _extract_xml(resp, "Model"),
-            "firmware":     _extract_xml(resp, "FirmwareVersion"),
-            "serial":       _extract_xml(resp, "SerialNumber"),
+        result = {
+            "manufacturer":    manufacturer or "Unknown",
+            "model":           model or manufacturer or "Unknown",
+            "firmware":        firmware,
+            "serial":          serial,
+            "hardware_id":     hardware_id,
+            "onvif_port":      str(port),
         }
 
-        # Get MAC via network interfaces
-        net_payload = NET_PAYLOAD_TMPL.format(auth_header=auth_header)
-        net_resp = _send_soap(url, net_payload, self.TIMEOUT)
-        if net_resp and net_resp != "401":
-            mac = _extract_xml(net_resp, "HwAddress")
-            if mac:
-                data["mac_address"] = mac.replace("-", ":").upper()
-
-        if any(data.values()):
-            logger.info(f"ONVIF data from {url}: {data}")
-
-        return data if any(data.values()) else {}
-
-
-onvif_prober = ONVIFProber()
+        logger.info(
+            f"ONVIF {ip}:{port} → "
+            f"mfr={manufacturer} model={model} "
+            f"fw={firmware} serial={serial}"
+        )
+        return result
