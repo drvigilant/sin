@@ -46,7 +46,7 @@ _HTTP_SIGS = [
     (r"hikvision",            {"vendor": "Hikvision", "device_type": "IP Camera/NVR"}),
     (r"webs.*hikvision",      {"vendor": "Hikvision", "device_type": "IP Camera/NVR"}),
     (r"/doc/page/login\.asp", {"vendor": "Hikvision", "device_type": "IP Camera/NVR"}),
-    (r"isapi",                {"vendor": "Hikvision", "device_type": "IP Camera/NVR"}),
+    (r"isapi/system/deviceinfo|hikvision.*isapi|isapi.*hikvision",  {"vendor": "Hikvision", "device_type": "IP Camera/NVR"}),
     # Dahua
     (r"dahua",                {"vendor": "Dahua", "device_type": "IP Camera/NVR"}),
     (r"dh-ipc",               {"vendor": "Dahua", "device_type": "IP Camera"}),

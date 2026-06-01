@@ -425,8 +425,18 @@ class AuditEngine:
                 "port": 34567,
             })
 
-        # Hikvision ISAPI
-        if "hikvision" in mfr or "hikvision" in banners:
+        # Hikvision ISAPI — only fire when vendor is CONFIRMED Hikvision
+        # Guard: "hikvision" must appear in the manufacturer field set by
+        # http_fingerprinting or ONVIF, not just in a banner substring.
+        # This prevents Securus/OEM cameras (which respond on ISAPI-like paths)
+        # from triggering Hikvision-specific CVEs.
+        _confirmed_hikvision = (
+            "hikvision" in mfr and
+            "securus" not in mfr and      # Securus is Xiongmai OEM, not Hikvision
+            "generic" not in mfr and
+            "oem" not in mfr
+        )
+        if _confirmed_hikvision:
             if 8000 in ports or 80 in ports:
                 vulnerabilities.append({
                     "severity": "HIGH",

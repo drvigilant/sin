@@ -145,6 +145,17 @@ class AgentRunner:
             if port in set(ports):
                 _broadcast_ws("TRAFFIC_ALERT", {"anomaly": f"{ip} [{vendor}] — {label} (:{port})"})
 
+        # ── JARM TLS fingerprint (Phase 2.2) ──────────────────────────────────
+        # Runs on ports 443/8443 only — skipped if neither is open (fast path)
+        if not asset.get("jarm_hash") and ({443, 8443} & set(ports)):
+            try:
+                from sin.scanner.jarm import probe_jarm
+                jarm = probe_jarm(ip, ports)
+                if jarm:
+                    asset["jarm_hash"] = jarm
+            except Exception as e:
+                logger.debug(f"[jarm] {ip} probe error: {e}")
+
         # ── DecisionEngine: device-type damper + packet signal enrichment ─────
         # We do NOT use verdict.confidence as the final score — that path
         # accumulates +0.80 per CRITICAL finding additively and always hits 100.

@@ -103,7 +103,8 @@ class ONVIFAuditor:
                 findings.append({
                     "severity": "HIGH",
                     "type": "Unauthenticated ONVIF Device Info",
-                    "cve": "CWE-306",
+                    "cve": "",
+                    "cwe": "CWE-306",
                     "description": (
                         f"ONVIF GetDeviceInformation returns device details "
                         f"without any authentication on {ip}:{onvif_port}. "
@@ -118,7 +119,8 @@ class ONVIFAuditor:
                 findings.append({
                     "severity": "CRITICAL",
                     "type": "Unauthenticated ONVIF User Enumeration",
-                    "cve": "CWE-306",
+                    "cve": "",
+                    "cwe": "CWE-306",
                     "description": (
                         f"ONVIF GetUsers returns all user accounts without "
                         f"authentication on {ip}:{onvif_port}. "
@@ -133,7 +135,8 @@ class ONVIFAuditor:
                 findings.append({
                     "severity": "CRITICAL",
                     "type": "Unauthenticated ONVIF Backdoor Creation",
-                    "cve": "CWE-306",
+                    "cve": "",
+                    "cwe": "CWE-306",
                     "description": (
                         f"ONVIF CreateUsers succeeds without authentication on "
                         f"{ip}:{onvif_port}. Full device takeover achievable "
