@@ -230,101 +230,102 @@ class TestProbeXiongmaiSDK(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestCompositeRiskScoring(unittest.TestCase):
-    """_composite_score and _risk_level must match the Phase 3.1 spec."""
+    """
+    _compute_risk() must produce realistic, differentiated scores.
+
+    Rules (Phase 3.1):
+      - Score = highest finding weight + capped secondary bonus (max +20)
+      - CRITICAL requires has_rce AND creds_confirmed
+      - HIGH     requires score >= 50 (with or without rce)
+      - MEDIUM   score >= 25
+      - LOW      score < 25
+      - Max auto score = 99 (100 reserved for human-confirmed compromise)
+    """
 
     def setUp(self):
-        from sin.scanner.audit import _composite_score, _risk_level
-        self._score = _composite_score
-        self._level = _risk_level
+        from sin.scanner.audit import _compute_risk
+        self._score = lambda findings, creds=False: _compute_risk(findings, creds)
 
-    # ── score tests ───────────────────────────────────────────────────────────
+    # ── score correctness ─────────────────────────────────────────────────────
 
     def test_empty_findings_score_zero(self):
-        self.assertEqual(self._score([]), 0)
+        score, level = self._score([])
+        self.assertEqual(score, 0)
+        self.assertEqual(level, "LOW")
 
-    def test_single_rce_finding(self):
-        vulns = [{"type": "Remote Code Execution", "severity": "CRITICAL"}]
-        score = self._score(vulns)
-        # base=90, no bonus
-        self.assertEqual(score, 90)
+    def test_score_never_exceeds_99(self):
+        # Pile on many CRITICAL findings — score must stay ≤ 99
+        many = [{"severity": "CRITICAL", "type": "Remote Code Execution",
+                 "cve": "CVE-2018-10088", "in_kev": True, "epss": 0.99}] * 10
+        score, _ = self._score(many, creds=True)
+        self.assertLessEqual(score, 99, f"Score {score} exceeded 99 — auto scoring must never hit 100")
 
-    def test_xiongmai_device_192_168_30_4_score_approx_85(self):
-        """
-        192.168.30.4 has: port 34567 (RCE/90) + port 554 RTSP (45) + port 80 HTTP (20).
-        Expected: base=90, bonus=(45+20)*0.30=19.5 → score=109 clamped → 100?
-        Wait — the spec says ~85. That's because RTSP weight=45 and HTTP=20.
-        base=90 + (45*0.3 + 20*0.3) = 90 + 13.5 + 6 = 109.5 → capped 100.
-        But without creds confirmed, level=HIGH, score must be < 100 for HIGH to matter.
+    def test_single_rce_finding_scores_high(self):
+        # CVE-2018-10088 weight=85 → base 85, no bonus → HIGH
+        score, level = self._score([
+            {"severity": "CRITICAL", "type": "Remote Code Execution",
+             "cve": "CVE-2018-10088"}
+        ])
+        self.assertGreaterEqual(score, 50, f"RCE finding should score >= 50, got {score}")
+        self.assertIn(level, ("HIGH", "CRITICAL"))
 
-        Re-reading spec: "correct score should be ~85, level HIGH not CRITICAL".
-        The intent is that without creds confirmed the score stays ~85 not 100.
-        The formula: base=90 + remaining*0.3. With RTSP(45)+HTTP(20):
-          bonus = (45+20)*0.3 = 19.5 → total = 109 → capped 100.
-        100 is still HIGH (not CRITICAL, since no creds). So the key assertion
-        is level=HIGH; score is in [80,100] range.
-        """
-        vulns = [
-            {"type": "Remote Code Execution",   "severity": "CRITICAL"},  # port 34567
-            {"type": "Privacy Leak (RTSP)",      "severity": "HIGH"},      # port 554
-            {"type": "Unencrypted Management",   "severity": "MEDIUM"},    # port 80
-        ]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
-        # Score must be >= 80 (HIGH/CRITICAL territory) but level must be HIGH
-        self.assertGreaterEqual(score, 70, f"score={score} unexpectedly low")
-        self.assertEqual(level, "HIGH", f"Expected HIGH but got {level} (score={score})")
-
-    def test_score_does_not_exceed_100(self):
-        many = [{"type": "Remote Code Execution", "severity": "CRITICAL"}] * 10
-        self.assertLessEqual(self._score(many), 100)
-
-    def test_additive_no_longer_inflates_telnet_only(self):
-        """Single Telnet finding should NOT push score to 100 (old additive gave +95)."""
-        vulns = [{"type": "Cleartext Management", "severity": "CRITICAL"}]
-        score = self._score(vulns)
-        self.assertLessEqual(score, 80, f"Telnet-only score {score} too high — additive bug?")
-
-    # ── level tests ───────────────────────────────────────────────────────────
-
-    def test_critical_requires_rce_plus_creds(self):
-        vulns = [
-            {"type": "Remote Code Execution", "severity": "CRITICAL"},
-            {"type": "DEFAULT_CREDS_FOUND",   "severity": "CRITICAL"},
-        ]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
-        self.assertEqual(level, "CRITICAL")
-
-    def test_high_when_rce_no_creds(self):
-        vulns = [
-            {"type": "Remote Code Execution", "severity": "CRITICAL"},
-            {"type": "Privacy Leak (RTSP)",   "severity": "HIGH"},
-        ]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
-        self.assertEqual(level, "HIGH")
-
-    def test_not_critical_without_creds_even_with_smb(self):
-        vulns = [{"type": "Windows SMB Exposure", "severity": "CRITICAL"}]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
-        self.assertNotEqual(level, "CRITICAL",
-            "SMB alone (no creds) must not be CRITICAL under Phase 3.1 rules")
-        self.assertEqual(level, "HIGH")
-
-    def test_medium_level(self):
-        # Router Admin Exposure weighs 65 → score=65 → MEDIUM (40–69, no RCE class)
-        vulns = [{"type": "Router Admin Exposure", "severity": "HIGH"}]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
-        self.assertEqual(score, 65)
+    def test_http_only_scores_medium(self):
+        # weight=30 → MEDIUM band
+        score, level = self._score([
+            {"severity": "LOW", "type": "Unencrypted Management HTTP", "cve": ""}
+        ])
+        self.assertGreaterEqual(score, 25)
         self.assertEqual(level, "MEDIUM")
 
-    def test_low_level(self):
-        vulns = [{"severity": "INFO", "type": "Some Info Finding"}]
-        score = self._score(vulns)
-        level = self._level(score, vulns)
+    def test_rtsp_only_scores_medium(self):
+        score, level = self._score([
+            {"severity": "MEDIUM", "type": "Privacy Leak (RTSP)", "cve": ""}
+        ])
+        self.assertEqual(level, "MEDIUM")
+
+    # ── level correctness ─────────────────────────────────────────────────────
+
+    def test_critical_requires_rce_and_confirmed_creds(self):
+        score, level = self._score([
+            {"severity": "CRITICAL", "type": "Remote Code Execution",
+             "cve": "CVE-2018-10088"},
+            {"severity": "CRITICAL", "type": "DEFAULT_CREDS_FOUND", "cve": ""},
+        ], creds=True)
+        self.assertEqual(level, "CRITICAL",
+            f"RCE + confirmed creds must be CRITICAL, got {level} (score={score})")
+
+    def test_rce_without_creds_is_high_not_critical(self):
+        # 192.168.30.4 profile: RCE port open, no cred confirmation
+        score, level = self._score([
+            {"severity": "CRITICAL", "type": "Remote Code Execution",
+             "cve": "CVE-2018-10088", "in_kev": True, "epss": 0.9},
+            {"severity": "MEDIUM",   "type": "Privacy Leak (RTSP)", "cve": ""},
+            {"severity": "LOW",      "type": "Unencrypted Management HTTP", "cve": ""},
+        ], creds=False)
+        self.assertEqual(level, "HIGH",
+            f"RCE without confirmed creds must be HIGH not CRITICAL, got {level} (score={score})")
+
+    def test_smb_without_creds_is_not_critical(self):
+        score, level = self._score([
+            {"severity": "CRITICAL", "type": "Windows SMB Exposure", "cve": ""}
+        ], creds=False)
+        self.assertNotEqual(level, "CRITICAL",
+            f"SMB alone (no creds) must not be CRITICAL under Phase 3.1 rules, got {level}")
+        self.assertEqual(level, "HIGH")
+
+    def test_telnet_alone_not_pegged_to_100(self):
+        # Old additive scoring gave telnet +95 → capped 100; new must be < 85
+        score, level = self._score([
+            {"severity": "CRITICAL", "type": "Cleartext Management Telnet", "cve": ""}
+        ])
+        self.assertLess(score, 85,
+            f"Telnet alone scored {score} — additive inflation bug still present")
+        self.assertEqual(level, "HIGH")
+
+    def test_low_level_clean(self):
+        score, level = self._score([])
         self.assertEqual(level, "LOW")
+        self.assertEqual(score, 0)
 
 
 if __name__ == "__main__":

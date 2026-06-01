@@ -132,20 +132,47 @@ class AgentRunner:
 
     def _process_asset(self, asset: Dict) -> Dict:
         ip = asset.get("ip_address", "?")
-        vulns, _audit_score, _audit_action = self.auditor.evaluate_asset(asset)
+
+        # ── AuditEngine: evidence-based findings + calibrated score ───────────
+        vulns, audit_score, _audit_action = self.auditor.evaluate_asset(asset)
         asset["vulnerabilities"] = vulns
         asset = normalize_host(asset)
+
         vendor = asset.get("manufacturer") or asset.get("vendor") or "Unknown"
-        ports = asset.get("open_ports", [])
+        ports  = asset.get("open_ports", [])
         _broadcast_ws("FLOW_NEW", {"src": ip, "dst": "192.168.30.1", "proto": "TCP"})
         for port, label in _DANGEROUS_PORTS.items():
             if port in set(ports):
                 _broadcast_ws("TRAFFIC_ALERT", {"anomaly": f"{ip} [{vendor}] — {label} (:{port})"})
+
+        # ── DecisionEngine: device-type damper + packet signal enrichment ─────
+        # We do NOT use verdict.confidence as the final score — that path
+        # accumulates +0.80 per CRITICAL finding additively and always hits 100.
+        # Instead, AuditEngine's score is authoritative; DecisionEngine's
+        # confidence damper (device-type adjustment) is applied on top.
         verdict: ThreatVerdict = self.decision.evaluate(asset)
-        asset["risk_score"] = round(verdict.confidence * 100)
-        asset["risk_level"] = verdict.severity
+        device_type = asset.get("device_type", "unknown")
+        damper = {
+            "router": 1.0, "camera": 1.0, "nvr_dvr": 1.0,
+            "iot": 0.95, "workstation": 0.70, "server": 0.60,
+            "printer": 0.80, "unknown": 0.85,
+        }.get(device_type, 0.85)
+
+        final_score = min(int(round(audit_score * damper)), 99)
+
+        # Severity from the AuditEngine risk_level (already set on asset by evaluate_asset)
+        risk_level = asset.get("risk_level") or verdict.severity
+
+        asset["risk_score"]   = final_score
+        asset["risk_level"]   = risk_level
         asset["risk_reasons"] = verdict.reasons
-        asset["verdict"] = {"score": verdict.score, "confidence": verdict.confidence, "severity": verdict.severity, "action": verdict.recommended_action, "signals": verdict.signal_count}
+        asset["verdict"]      = {
+            "score":      round(audit_score / 100, 4),
+            "confidence": round(final_score  / 100, 4),
+            "severity":   risk_level,
+            "action":     verdict.recommended_action,
+            "signals":    verdict.signal_count,
+        }
         auto_quarantine_critical = _policy_enabled("auto_quarantine_critical", True)
         force_auto_quarantine = auto_quarantine_critical and asset.get("risk_score", 0) > 90
         if verdict.is_actionable(_CONFIDENCE_THRESHOLD) or force_auto_quarantine:

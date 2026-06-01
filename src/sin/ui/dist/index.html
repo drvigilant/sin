@@ -22,9 +22,9 @@
   --accent:    #3b82f6;
   --accent-dim:rgba(59,130,246,0.12);
   --accent-glow:rgba(59,130,246,0.25);
-  --red:       #ef4444;
-  --red-dim:   rgba(239,68,68,0.12);
-  --red-glow:  rgba(239,68,68,0.25);
+  --red:       #d9534f;
+  --red-dim:   rgba(217,83,79,0.12);
+  --red-glow:  rgba(217,83,79,0.25);
   --amber:     #f59e0b;
   --amber-dim: rgba(245,158,11,0.12);
   --green:     #10b981;
@@ -70,7 +70,7 @@ input { font-family: var(--font-data); }
 
 /* ── SIDEBAR ── */
 .sidebar-brand { height: var(--topbar-h); display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.brand-mark { width: 26px; height: 26px; background: var(--red-dim); border: 1px solid rgba(239,68,68,0.35); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.brand-mark { width: 26px; height: 26px; background: var(--red-dim); border: 1px solid rgba(217,83,79,0.35); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .brand-dot { width: 7px; height: 7px; background: var(--red); border-radius: 50%; box-shadow: 0 0 6px var(--red); animation: pulse-dot 2s ease-in-out infinite; }
 @keyframes pulse-dot { 0%,100%{opacity:1;box-shadow:0 0 6px currentColor}50%{opacity:0.6;box-shadow:0 0 14px currentColor} }
 .brand-text { font-family: var(--font-ui); font-size: 16px; font-weight: 800; letter-spacing: 0.06em; }
@@ -132,7 +132,7 @@ input { font-family: var(--font-data); }
 .pane-meta { display: flex; gap: 6px; margin-left: auto; }
 .chip { font-size: 9px; padding: 2px 7px; border: 1px solid var(--border2); color: var(--text3); background: var(--surface2); }
 .chip.green { color: var(--green); border-color: rgba(16,185,129,0.3); background: var(--green-dim); }
-.chip.red { color: var(--red); border-color: rgba(239,68,68,0.3); background: var(--red-dim); }
+.chip.red { color: var(--red); border-color: rgba(217,83,79,0.3); background: var(--red-dim); }
 .chip.amber { color: var(--amber); border-color: rgba(245,158,11,0.3); background: var(--amber-dim); }
 .chip.scanning { animation: scanpulse 0.9s ease-in-out infinite; }
 @keyframes scanpulse { 0%,100%{opacity:0.5}50%{opacity:1} }
@@ -164,7 +164,7 @@ tbody td:last-child { padding-right: 16px; }
 .td-mac { font-size: 11px; color: var(--text2); display: block; }
 .td-vendor { font-size: 9px; color: var(--accent); display: block; margin-top: 2px; letter-spacing: 0.04em; }
 .risk-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 9px; font-weight: 600; letter-spacing: 0.1em; border: 1px solid; }
-.risk-pill.CRITICAL { color: var(--red); border-color: rgba(239,68,68,0.35); background: var(--red-dim); }
+.risk-pill.CRITICAL { color: var(--red); border-color: rgba(217,83,79,0.35); background: var(--red-dim); }
 .risk-pill.HIGH { color: var(--amber); border-color: rgba(245,158,11,0.35); background: var(--amber-dim); }
 .risk-pill.MEDIUM { color: var(--accent); border-color: rgba(59,130,246,0.35); background: var(--accent-dim); }
 .risk-pill.LOW { color: var(--green); border-color: rgba(16,185,129,0.35); background: var(--green-dim); }
@@ -172,18 +172,18 @@ tbody td:last-child { padding-right: 16px; }
 .risk-score-fill { height: 100%; transition: width 0.4s ease; }
 .vuln-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .vtag { font-size: 8px; font-weight: 600; padding: 2px 5px; border: 1px solid; letter-spacing: 0.06em; }
-.vtag.CRITICAL { color: var(--red); border-color: rgba(239,68,68,0.4); background: var(--red-dim); }
+.vtag.CRITICAL { color: var(--red); border-color: rgba(217,83,79,0.4); background: var(--red-dim); }
 .vtag.HIGH { color: var(--amber); border-color: rgba(245,158,11,0.4); background: var(--amber-dim); }
 .vtag.MEDIUM { color: var(--accent); border-color: rgba(59,130,246,0.4); background: var(--accent-dim); }
 .vtag.clean { color: var(--green); border-color: rgba(16,185,129,0.3); background: var(--green-dim); }
 .ports-wrap { display: flex; gap: 3px; flex-wrap: wrap; }
 .port-tag { font-size: 9px; color: var(--cyan); background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.2); padding: 1px 4px; }
-.port-tag.danger { color: var(--red); background: var(--red-dim); border-color: rgba(239,68,68,0.3); }
+.port-tag.danger { color: var(--red); background: var(--red-dim); border-color: rgba(217,83,79,0.3); }
 .state-tag { font-size: 8px; font-weight: 600; letter-spacing: 0.1em; padding: 3px 7px; border: 1px solid; display: inline-block; text-transform: uppercase; }
 .state-online { color: var(--green); border-color: rgba(16,185,129,0.3); background: var(--green-dim); }
 .state-isolated { color: var(--amber); border-color: rgba(245,158,11,0.3); background: var(--amber-dim); }
 .act-btn { padding: 4px 10px; border: 1px solid; font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; background: transparent; transition: all 0.12s; font-family: var(--font-ui); }
-.act-btn.quar { color: var(--red); border-color: rgba(239,68,68,0.35); }
+.act-btn.quar { color: var(--red); border-color: rgba(217,83,79,0.35); }
 .act-btn.quar:hover { background: var(--red-dim); }
 .act-btn.quar.active { color: var(--amber); border-color: rgba(245,158,11,0.35); }
 .act-btn.insp { color: var(--text3); border-color: var(--border2); margin-left: 5px; }
@@ -198,7 +198,7 @@ tbody td:last-child { padding-right: 16px; }
 .ev-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .ev-time { font-size: 9px; color: var(--accent); flex-shrink: 0; }
 .ev-badge { font-size: 8px; font-weight: 600; letter-spacing: 0.08em; padding: 1px 5px; border: 1px solid; flex-shrink: 0; }
-.ev-badge.crit { color: var(--red); border-color: rgba(239,68,68,0.4); background: var(--red-dim); }
+.ev-badge.crit { color: var(--red); border-color: rgba(217,83,79,0.4); background: var(--red-dim); }
 .ev-badge.warn { color: var(--amber); border-color: rgba(245,158,11,0.4); background: var(--amber-dim); }
 .ev-badge.ok { color: var(--green); border-color: rgba(16,185,129,0.4); background: var(--green-dim); }
 .ev-badge.info { color: var(--accent); border-color: rgba(59,130,246,0.4); background: var(--accent-dim); }
@@ -219,7 +219,7 @@ tbody td:last-child { padding-right: 16px; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 3px; }
 .hm-cell { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; cursor: pointer; transition: transform 0.12s; }
 .hm-cell:hover { transform: scale(1.15); z-index: 5; }
-.hm-CRITICAL { background: rgba(239,68,68,0.75); color: #fff; border: 1px solid rgba(239,68,68,0.5); }
+.hm-CRITICAL { background: rgba(217,83,79,0.75); color: #fff; border: 1px solid rgba(217,83,79,0.5); }
 .hm-HIGH { background: rgba(245,158,11,0.6); color: #fff; border: 1px solid rgba(245,158,11,0.4); }
 .hm-MEDIUM { background: rgba(59,130,246,0.35); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
 .hm-LOW { background: rgba(16,185,129,0.2); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
@@ -283,7 +283,7 @@ tbody td:last-child { padding-right: 16px; }
 .flow-main { color: var(--text); }
 .flow-sub { font-size: 9px; color: var(--text3); margin-top: 3px; }
 .anomaly-row { border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.06); color: var(--amber); font-size: 10px; padding: 8px 10px; }
-.anomaly-row.crit { border-color: rgba(239,68,68,0.35); background: var(--red-dim); color: var(--red); }
+.anomaly-row.crit { border-color: rgba(217,83,79,0.35); background: var(--red-dim); color: var(--red); }
 
 /* ── INCIDENTS ── */
 .incidents-page { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -390,7 +390,7 @@ tbody .sev-INFO { color: var(--text3); }
 .fw-empty { padding: 60px 20px; text-align: center; color: var(--text3); font-size: 10px; letter-spacing: 0.1em; }
 .fw-empty i { font-size: 32px; display: block; margin-bottom: 14px; color: var(--border2); }
 .fw-risk-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; border: 1px solid; }
-.fw-risk-CRITICAL,.fw-risk-HIGH { color: var(--red); border-color: rgba(239,68,68,0.35); background: var(--red-dim); }
+.fw-risk-CRITICAL,.fw-risk-HIGH { color: var(--red); border-color: rgba(217,83,79,0.35); background: var(--red-dim); }
 .fw-risk-MEDIUM { color: var(--amber); border-color: rgba(245,158,11,0.35); background: var(--amber-dim); }
 .fw-risk-LOW { color: var(--green); border-color: rgba(16,185,129,0.35); background: var(--green-dim); }
 /* ── FOOTER ── */
@@ -497,6 +497,11 @@ tbody .sev-INFO { color: var(--text3); }
         <i class="fas fa-network-wired"></i>
         <span style="font-size:9px;color:var(--text3);letter-spacing:0.08em;">TARGET</span>
         <input class="subnet-inp" id="subnet-input" type="text" value="192.168.30.0/24">
+      </div>
+      <div class="topbar-chip" id="uptime-chip" title="Server uptime">
+        <i class="fas fa-server" style="font-size:9px;"></i>
+        <span style="font-size:9px;color:var(--text3);letter-spacing:0.08em;">UP</span>
+        <span id="uptime-val" style="font-family:var(--font-data);font-size:10px;color:var(--text2);">—</span>
       </div>
       <button class="scan-btn" id="scan-btn">
         <i class="fas fa-crosshairs" style="font-size:10px;"></i>
@@ -607,7 +612,7 @@ tbody .sev-INFO { color: var(--text3); }
             <div class="panel-body">
               <div class="heatmap-grid" id="heatmap-grid"></div>
               <div class="hm-legend">
-                <div class="hm-leg"><div class="hm-dot" style="background:rgba(239,68,68,0.75)"></div>Critical</div>
+                <div class="hm-leg"><div class="hm-dot" style="background:rgba(217,83,79,0.75)"></div>Critical</div>
                 <div class="hm-leg"><div class="hm-dot" style="background:rgba(245,158,11,0.6)"></div>High</div>
                 <div class="hm-leg"><div class="hm-dot" style="background:rgba(59,130,246,0.35)"></div>Medium</div>
                 <div class="hm-leg"><div class="hm-dot" style="background:rgba(16,185,129,0.2)"></div>Low</div>
@@ -823,6 +828,8 @@ function tick(){
   const ut=`${pad(Math.floor(e/3600))}:${pad(Math.floor((e%3600)/60))}:${pad(e%60)}`;
   document.getElementById('uptime').textContent=ut;
   document.getElementById('sidebar-uptime').textContent='Uptime: '+ut;
+  const uptimeChipVal = document.getElementById('uptime-val');
+  if(uptimeChipVal) uptimeChipVal.textContent=ut;
 }
 tick(); setInterval(tick,1000);
 
@@ -1034,7 +1041,7 @@ function renderDevices(){
     const vendor=(d.vendor||d.manufacturer||'Unknown');
     const hostname=d.hostname&&d.hostname!=='Unknown'?d.hostname:(d.model&&d.model!=='Unknown'?d.model:'');
     const rc=riskColor(level);
-    const rowBg=level==='CRITICAL'?'background:rgba(239,68,68,0.03);':level==='HIGH'?'background:rgba(245,158,11,0.02);':'';
+    const rowBg=level==='CRITICAL'?'background:rgba(217,83,79,0.03);':level==='HIGH'?'background:rgba(245,158,11,0.02);':'';
     return `<tr style="${rowBg}">
       <td><span class="td-ip">${esc(d.ip_address)}</span><span class="td-name">${esc(hostname||vendor)}</span></td>
       <td><span class="td-mac">${esc(d.mac_address||'—')}</span><span class="td-vendor">${esc(vendor.substring(0,16).toUpperCase())}</span></td>
@@ -1206,7 +1213,7 @@ async function loadThreats(){
     if(!threats||threats.length===0){list.innerHTML='<div style="color:var(--green);font-size:10px;padding:20px;">✓ NO ACTIVE THREATS DETECTED</div>';return;}
     list.innerHTML=threats.map(t=>{
       const sev=(t.severity||'LOW').toUpperCase();
-      const scol=sev==='CRITICAL'?'color:var(--red);border-color:rgba(239,68,68,0.4);background:var(--red-dim);':sev==='HIGH'?'color:var(--amber);border-color:rgba(245,158,11,0.4);background:var(--amber-dim);':'color:var(--accent);border-color:rgba(59,130,246,0.4);background:var(--accent-dim);';
+      const scol=sev==='CRITICAL'?'color:var(--red);border-color:rgba(217,83,79,0.4);background:var(--red-dim);':sev==='HIGH'?'color:var(--amber);border-color:rgba(245,158,11,0.4);background:var(--amber-dim);':'color:var(--accent);border-color:rgba(59,130,246,0.4);background:var(--accent-dim);';
       return `<div class="threat-card ${sev}"><div class="threat-head"><span class="threat-id">${esc(t.id)}</span><span class="threat-sev" style="${scol}">${sev}</span></div><div class="threat-desc">${esc(t.description||'—')}</div><div class="threat-ep"><i class="fas fa-circle" style="font-size:6px;margin-right:5px;color:var(--text3);"></i>${t.affected_endpoints||0} affected endpoint${(t.affected_endpoints||0)!==1?'s':''}</div></div>`;
     }).join('');
   }catch(e){if(e.message!=='401')console.error(e);}

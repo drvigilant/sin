@@ -20,7 +20,12 @@ from sin.agent.packet import PacketSniffer
 from sin.storage.database import SessionLocal
 from sin.storage import models
 
+import datetime as _dt
+
 logger = get_logger("sin.api.server")
+
+# ── Server start time — persists for the lifetime of this process ──
+_SERVER_START_TIME: _dt.datetime = _dt.datetime.utcnow()
 
 # ── API key auth configuration ──
 _API_KEY        = os.getenv("SIN_API_KEY", "")
@@ -422,10 +427,14 @@ def _build_stats(db: Session) -> dict:
     critical = sum(sum(1 for v in (d.vulnerabilities or []) if v.get("severity") == "CRITICAL") for d in devices)
     isolated = sum(1 for d in devices if d.status == "mitigated")
     scans = db.query(models.ScanSession).count()
+    uptime_seconds = int((_dt.datetime.utcnow() - _SERVER_START_TIME).total_seconds())
     return {
         "total_devices": total, "total_assets_tracked": total, "vulnerable": vulnerable, "critical": critical,
         "isolated": isolated, "clean": total - vulnerable,
-        "total_scans": scans, "total_scan_runs": scans, "latest_activity": latest_session.start_time.isoformat(), "scanning": _is_scan_running(),
+        "total_scans": scans, "total_scan_runs": scans, "latest_activity": latest_session.start_time.isoformat(),
+        "scanning": _is_scan_running(),
+        "server_start_time": _SERVER_START_TIME.isoformat() + "Z",
+        "uptime_seconds": uptime_seconds,
     }
 
 @app.get("/stats")

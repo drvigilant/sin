@@ -201,13 +201,19 @@ def _compute_risk(findings: List[Dict], creds_confirmed: bool) -> Tuple[int, str
     # Confirmed default creds upgrades score significantly
     cred_bonus = 15 if creds_confirmed else 0
 
-    # KEV and EPSS bonuses
-    kev_bonus  = 10 if any(f.get("in_kev") for f in findings) else 0
-    epss_bonus = 5  if any(f.get("epss", 0.0) >= 0.5 for f in findings) else 0
+    # KEV and EPSS bonuses — intentionally small; CVE weights already reflect severity.
+    # These are confirmatory nudges, not score drivers.
+    kev_bonus  = 5  if any(f.get("in_kev") for f in findings) else 0
+    epss_bonus = 3  if any(f.get("epss", 0.0) >= 0.5 for f in findings) else 0
 
     score = int(min(base + bonus + cred_bonus + kev_bonus + epss_bonus, 99))
 
-    # Severity: CRITICAL requires both high score AND an RCE-class finding
+    # ── Severity thresholds ───────────────────────────────────────────────────
+    # CRITICAL requires BOTH:
+    #   1. An RCE-class finding (CVE or finding type)
+    #   2. Default credentials confirmed on the device
+    # This prevents port-open-alone (no active exploitation proof) from reaching CRITICAL.
+    # RCE present but creds unknown → HIGH (still serious, not confirmed full compromise).
     rce_types = {"Remote Code Execution", "Backdoor Access", "Exposed Database",
                  "Industrial Control Exposure", "Windows SMB Exposure"}
     rce_cves  = {"CVE-2018-10088", "CVE-2017-7921", "CVE-2021-36260",
@@ -217,8 +223,10 @@ def _compute_risk(findings: List[Dict], creds_confirmed: bool) -> Tuple[int, str
         for f in findings
     )
 
-    if score >= 75 and (has_rce or creds_confirmed):
+    if score >= 75 and has_rce and creds_confirmed:
         level = "CRITICAL"
+    elif score >= 50 and has_rce:
+        level = "HIGH"
     elif score >= 50:
         level = "HIGH"
     elif score >= 25:
