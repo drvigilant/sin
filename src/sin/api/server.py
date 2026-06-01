@@ -424,7 +424,7 @@ def _build_stats(db: Session) -> dict:
     devices = db.query(models.DeviceLog).filter(models.DeviceLog.scan_id == latest_session.id).all()
     total = len(devices)
     vulnerable = sum(1 for d in devices if d.vulnerabilities)
-    critical = sum(sum(1 for v in (d.vulnerabilities or []) if v.get("severity") == "CRITICAL") for d in devices)
+    critical = sum(1 for d in devices if (d.risk_level or "").upper() == "CRITICAL")
     isolated = sum(1 for d in devices if d.status == "mitigated")
     scans = db.query(models.ScanSession).count()
     uptime_seconds = int((_dt.datetime.utcnow() - _SERVER_START_TIME).total_seconds())

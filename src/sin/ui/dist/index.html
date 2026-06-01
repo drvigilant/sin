@@ -65,7 +65,7 @@ input { font-family: var(--font-data); }
 
 /* ── LAYOUT ── */
 .app-shell { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
 /* ── SIDEBAR ── */
@@ -191,7 +191,7 @@ tbody td:last-child { padding-right: 16px; }
 .empty-row td { text-align: center; padding: 48px; color: var(--text3); font-size: 10px; letter-spacing: 0.12em; }
 
 /* ── EVENT STREAM SIDEBAR ── */
-.event-sidebar { width: 300px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); }
+.event-sidebar { width: 300px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg); }
 .event-list { flex: 1; overflow-y: auto; }
 .ev-entry { padding: 10px 14px; border-bottom: 1px solid rgba(30,35,48,0.6); cursor: default; transition: background 0.1s; }
 .ev-entry:hover { background: var(--surface2); }
@@ -989,7 +989,7 @@ async function loadDevices(force=false){
       devices=fresh;
       renderDevices();
       document.getElementById('hdr-alive').textContent=`${devices.length} ALIVE`;
-      const crits=devices.filter(d=>(d.vulnerabilities||[]).some(v=>v.severity==='CRITICAL')).length;
+      const crits=devices.filter(d=>(d.risk_level||'').toUpperCase()==='CRITICAL').length;
       document.getElementById('hdr-crit').textContent=`${crits} CRITICAL`;
     }
   }catch(e){if(e.message!=='401')console.error('devices:',e);}
@@ -1035,8 +1035,10 @@ function renderDevices(){
     const level=(d.risk_level||'LOW').toUpperCase();
     const score=d.risk_score||0;
     const iso=d.status==='mitigated'||d.status==='isolated';
-    const vulns=(d.vulnerabilities||[]).slice(0,3);
-    const cveTags=vulns.length===0?'<span class="vtag clean">✓ CLEAN</span>':vulns.map(v=>`<span class="vtag ${esc(v.severity||'LOW')}">${esc(v.cve||v.type||'VULN').substring(0,14)}</span>`).join('');
+    const allVulns=(d.vulnerabilities||[]);
+    const vulns=allVulns.slice(0,4);
+    const overflow=allVulns.length>4?`<span class="vtag" style="color:var(--text3);border-color:var(--border2);">+${allVulns.length-4}</span>`:'';
+    const cveTags=vulns.length===0?'<span class="vtag clean">✓ CLEAN</span>':vulns.map(v=>`<span class="vtag ${esc(v.severity||'LOW')}">${esc(v.cve||v.type||'VULN')}</span>`).join('')+overflow;
     const ports=(d.open_ports||[]).slice(0,5).map(p=>`<span class="port-tag ${DANGER_PORTS.includes(p)?'danger':''}">${p}</span>`).join('');
     const vendor=(d.vendor||d.manufacturer||'Unknown');
     const hostname=d.hostname&&d.hostname!=='Unknown'?d.hostname:(d.model&&d.model!=='Unknown'?d.model:'');
