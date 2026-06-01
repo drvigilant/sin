@@ -208,6 +208,166 @@ def _probe_sdk_port(ip: str) -> Optional[str]:
     return None
 
 
+# ── Xiongmai SDK login probe (Phase 2.1) ──────────────────────────────────────
+# The SDK login packet is a 20-byte header:
+#   Bytes 0-3 : magic  0xff 0x01 0x00 0x00
+#   Bytes 4-7 : session ID (zeros for pre-auth)
+#   Bytes 8-11: sequence number (zeros)
+#   Byte 12   : channel (0x00)
+#   Byte 13   : reserved (0x00)
+#   Bytes 14-15: command 0xa0 0x27  → OPLogin
+#   Bytes 16-19: payload length (little-endian uint32)
+# The JSON payload that follows is a standard Sophia login request.
+_XM_HEADER_FMT = "<4sIIBBHI"   # magic, sid, seq, ch, res, cmd, datalen
+_XM_MAGIC      = b'\xff\x01\x00\x00'
+_XM_CMD_LOGIN  = 0x27a0        # OPLogin command id
+_XM_CMD_SYSINFO = 0x27f8       # OPSystemInfo command id
+
+def _xm_build_packet(cmd: int, payload: bytes) -> bytes:
+    header = struct.pack(
+        _XM_HEADER_FMT,
+        _XM_MAGIC,   # magic
+        0,           # session id
+        0,           # sequence
+        0,           # channel
+        0,           # reserved
+        cmd,         # command
+        len(payload),
+    )
+    return header + payload
+
+
+def _xm_recv_packet(sock: socket.socket, timeout: float = 3.0) -> Optional[bytes]:
+    """Read one complete Xiongmai SDK packet; returns raw payload bytes."""
+    sock.settimeout(timeout)
+    try:
+        header = b''
+        while len(header) < 20:
+            chunk = sock.recv(20 - len(header))
+            if not chunk:
+                return None
+            header += chunk
+        if len(header) < 20 or header[:4] != _XM_MAGIC:
+            return None
+        data_len = struct.unpack_from("<I", header, 16)[0]
+        if data_len == 0 or data_len > 65536:
+            return b''
+        payload = b''
+        while len(payload) < data_len:
+            chunk = sock.recv(data_len - len(payload))
+            if not chunk:
+                break
+            payload += chunk
+        return payload
+    except Exception:
+        return None
+
+
+def probe_xiongmai_sdk(ip: str) -> Dict:
+    """
+    Send Xiongmai SDK login + OPSystemInfo request on port 34567.
+    Parse the JSON response to extract SN, BuildDate, HardWareVersion, SoftWareVersion.
+
+    Returns a dict with any of: vendor, model, firmware, serial_number, device_type.
+    Empty dict on failure (no port open / not Xiongmai / no parseable data).
+    """
+    import json as _json
+
+    result: Dict = {}
+
+    login_payload = _json.dumps({
+        "EncryptType": "MD5",
+        "LoginType":   "DVRIP-Web",
+        "PassWord":    "tlJwpbo6",   # MD5 of empty string — Xiongmai default
+        "UserName":    "admin",
+    }, separators=(',', ':')).encode() + b'\x0a'
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(4)
+        s.connect((ip, 34567))
+
+        # ── Step 1: send login ──────────────────────────────────────────────────
+        s.sendall(_xm_build_packet(_XM_CMD_LOGIN, login_payload))
+        login_resp_raw = _xm_recv_packet(s)
+
+        if login_resp_raw is None:
+            s.close()
+            return result
+
+        # Mark as Xiongmai regardless of auth outcome
+        result["vendor"]      = "Xiongmai (Sofia SDK)"
+        result["device_type"] = "DVR/NVR"
+
+        try:
+            login_resp = _json.loads(login_resp_raw.rstrip(b'\x0a').decode('utf-8', errors='ignore'))
+            ret_code = login_resp.get("Ret", -1)
+            # 100 = OK, 101 = wrong password but device confirmed
+            session_id = login_resp.get("SessionID", "0x0")
+        except Exception:
+            login_resp = {}
+            ret_code   = -1
+            session_id = "0x0"
+
+        logger.debug(f"[xm_sdk] {ip} login Ret={ret_code} sid={session_id}")
+
+        # ── Step 2: request OPSystemInfo (works even with wrong creds on many fw) ─
+        sysinfo_payload = _json.dumps({
+            "Name": "SystemInfo",
+        }, separators=(',', ':')).encode() + b'\x0a'
+
+        # Embed session id returned from login if available
+        try:
+            sid_int = int(session_id, 16) if isinstance(session_id, str) else int(session_id)
+        except Exception:
+            sid_int = 0
+
+        si_header = struct.pack(
+            _XM_HEADER_FMT,
+            _XM_MAGIC,
+            sid_int,
+            1,           # seq
+            0, 0,
+            _XM_CMD_SYSINFO,
+            len(sysinfo_payload),
+        )
+        s.sendall(si_header + sysinfo_payload)
+        si_raw = _xm_recv_packet(s, timeout=3.0)
+        s.close()
+
+        if si_raw:
+            try:
+                si = _json.loads(si_raw.rstrip(b'\x0a').decode('utf-8', errors='ignore'))
+                # Response may be nested under "SystemInfo" key or flat
+                info = si.get("SystemInfo", si)
+
+                sn       = info.get("SerialNo") or info.get("SN") or info.get("serialNumber")
+                build    = info.get("BuildDate") or info.get("BuildTime")
+                hw_ver   = info.get("HardWareVersion") or info.get("HardwareVersion")
+                sw_ver   = info.get("SoftWareVersion") or info.get("SoftwareVersion")
+                board    = info.get("BoardType")  or info.get("HardWareType")
+
+                if sn:
+                    result["serial_number"] = str(sn).strip()
+                if hw_ver:
+                    result["model"] = str(hw_ver).strip()
+                if sw_ver:
+                    result["firmware"] = str(sw_ver).strip()
+                elif build:
+                    result["firmware"] = f"Build {str(build).strip()}"
+                if board and result.get("model") in (None, "Unknown", ""):
+                    result["model"] = str(board).strip()
+
+                logger.info(f"[xm_sdk] {ip} OPSystemInfo → SN={sn} HW={hw_ver} SW={sw_ver} Build={build}")
+            except Exception as parse_err:
+                logger.debug(f"[xm_sdk] {ip} OPSystemInfo parse error: {parse_err}")
+
+    except Exception as e:
+        logger.debug(f"[xm_sdk] {ip} connection failed: {e}")
+
+    return result
+
+
 def fingerprint(ip: str, open_ports: list) -> Dict:
     """
     Run full HTTP + SDK fingerprinting on a device.
@@ -282,12 +442,20 @@ def fingerprint(ip: str, open_ports: list) -> Dict:
         if result.get("vendor") and result.get("firmware"):
             break
 
-    # ── Port 34567 SDK probe ───────────────────────────────────────────────────
-    if 34567 in open_ports and not result.get("vendor"):
-        sdk_vendor = _probe_sdk_port(ip)
-        if sdk_vendor:
-            result["vendor"] = sdk_vendor
-            result.setdefault("device_type", "DVR/NVR")
+    # ── Port 34567 SDK probe (Phase 2.1 — full Xiongmai binary interrogation) ──
+    if 34567 in open_ports:
+        sdk_data = probe_xiongmai_sdk(ip)
+        if sdk_data:
+            # Merge: never overwrite fields already found via HTTP
+            for k, v in sdk_data.items():
+                if not result.get(k) or result[k] in ("Unknown", "", None):
+                    result[k] = v
+        elif not result.get("vendor"):
+            # Fallback: old magic-byte probe to at least confirm vendor
+            sdk_vendor = _probe_sdk_port(ip)
+            if sdk_vendor:
+                result["vendor"] = sdk_vendor
+                result.setdefault("device_type", "DVR/NVR")
 
     # ── Signature matching on all collected blobs ──────────────────────────────
     combined = " ".join(all_blobs)

@@ -1,3 +1,4 @@
+from sin.health import check_all
 from fastapi import FastAPI, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -63,7 +64,7 @@ def _set_scan_running(value: bool) -> None:
     if r:
         try:
             if value:
-                r.setex(_SCAN_REDIS_KEY, 3600, "1")
+                r.setex(_SCAN_REDIS_KEY, 300, "1")  # 5-min TTL — auto-clears if runner crashes
             else:
                 r.delete(_SCAN_REDIS_KEY)
         except Exception:
@@ -227,17 +228,15 @@ def _save_policies(policies: Dict[str, bool]) -> None:
         logger.warning(f"Failed to save policies to Redis: {exc}")
 
 def run_scan_job(subnet: str):
-    _set_scan_running(True)
     try:
+        _set_scan_running(True)
         runner = AgentRunner()
         runner.run_assessment(subnet=subnet)
     except Exception as e:
-        logger.error(f"Background scan crashed: {e}")
+        logger.error(f"[scan] Scan job failed for {subnet}: {e}")
     finally:
         _set_scan_running(False)
-
-from sin.health import check_all, check_database, check_redis
-
+        logger.info(f"[scan] Scan flag cleared for {subnet}")
 @app.get("/health")
 def health_check():
     return check_all()

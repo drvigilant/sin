@@ -798,6 +798,7 @@ let ws=null, scanPoll=null;
 let devices=[], flowBuf=[], anomBuf=[];
 let sortField='risk_score', sortDir=-1, riskFilter='all';
 const startT=Date.now();
+let _serverStartT=null; // real server start time from /stats
 const PAL=['#3b82f6','#ef4444','#f59e0b','#10b981','#8b5cf6','#06b6d4','#d97757','#e3b341'];
 const DANGER_PORTS=[23,21,554,34567,37777,8000,1883];
 const PORT_NAMES={554:'RTSP',34567:'DVR-Web',80:'HTTP',443:'HTTPS',8000:'Hikvision',8080:'HTTP-Alt',22:'SSH',23:'Telnet',21:'FTP',1883:'MQTT',37777:'Dahua-SDK'};
@@ -817,7 +818,8 @@ function fmtTs(ts){try{return new Date(ts).toLocaleTimeString('en-IN',{hour12:fa
 function tick(){
   const t=istNow();
   document.getElementById('clock').textContent=`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())} IST`;
-  const e=Math.floor((Date.now()-startT)/1000);
+  const src = _serverStartT || startT;
+  const e=Math.floor((Date.now()-src)/1000);
   const ut=`${pad(Math.floor(e/3600))}:${pad(Math.floor((e%3600)/60))}:${pad(e%60)}`;
   document.getElementById('uptime').textContent=ut;
   document.getElementById('sidebar-uptime').textContent='Uptime: '+ut;
@@ -887,16 +889,52 @@ async function init(){
   setInterval(()=>loadDevices(false),90000); // longer interval, won't wipe on scan
 }
 if(JWT_TOKEN){
-  // Validate token is still alive before trusting it
+  // Try the stored access token first
   fetch(API+'/auth/me',{headers:{'Authorization':'Bearer '+JWT_TOKEN}})
-    .then(r=>{if(r.ok){init();}else{JWT_TOKEN='';REFRESH_TOKEN='';localStorage.removeItem('sin_jwt');localStorage.removeItem('sin_refresh');showAuth('Session expired. Please sign in.');}})
-    .catch(()=>showAuth());
+    .then(async r=>{
+      if(r.ok){
+        init();
+      } else if(REFRESH_TOKEN) {
+        // Access token expired — try refresh token before showing login
+        try {
+          const rr = await fetch(API+'/auth/refresh',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({refresh_token:REFRESH_TOKEN})
+          });
+          if(rr.ok){
+            const d = await rr.json();
+            JWT_TOKEN = d.access_token;
+            REFRESH_TOKEN = d.refresh_token;
+            localStorage.setItem('sin_jwt', JWT_TOKEN);
+            localStorage.setItem('sin_refresh', REFRESH_TOKEN);
+            init();
+          } else {
+            JWT_TOKEN=''; REFRESH_TOKEN='';
+            localStorage.removeItem('sin_jwt'); localStorage.removeItem('sin_refresh');
+            showAuth('Session expired. Please sign in.');
+          }
+        } catch(e){ showAuth(); }
+      } else {
+        JWT_TOKEN=''; REFRESH_TOKEN='';
+        localStorage.removeItem('sin_jwt'); localStorage.removeItem('sin_refresh');
+        showAuth('Session expired. Please sign in.');
+      }
+    })
+    .catch(()=>{
+      // Network error — if we have tokens try to init anyway
+      if(JWT_TOKEN) init(); else showAuth();
+    });
 } else showAuth();
 
 // Stats
 async function loadStats(){
   try{
     const s=await api('/stats');
+    // Track real server uptime from stats
+    if(s.server_start_time && !_serverStartT){
+      _serverStartT = new Date(s.server_start_time).getTime();
+    }
     document.getElementById('stat-total').textContent=s.total_devices??0;
     document.getElementById('stat-total-sub').textContent=`subnet · ${document.getElementById('subnet-input').value}`;
     document.getElementById('stat-critical').textContent=s.critical??0;
