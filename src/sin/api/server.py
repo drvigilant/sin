@@ -758,14 +758,33 @@ def get_anomalies():
 
 @app.post("/firmware/upload")
 async def upload_firmware(file: UploadFile = File(...)):
-    file_path = os.path.join(_FIRMWARE_UPLOAD_DIR, file.filename)
+    """
+    Upload and analyse a firmware binary.
+    Extraction runs in a thread pool so it doesn't block the async event loop.
+    Large UBI/squashfs images can take several minutes — nginx timeout set to 600s.
+    """
+    import asyncio
+
+    # Save upload to disk first
+    safe_name = os.path.basename(file.filename or "firmware.bin")
+    file_path = os.path.join(_FIRMWARE_UPLOAD_DIR, safe_name)
+    os.makedirs(_FIRMWARE_UPLOAD_DIR, exist_ok=True)
+
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    extract_result = FirmwareExtractor().extract(file_path)
-    secret_result = {}
-    if extract_result["success"] and extract_result["extracted_path"]:
-        secret_result = SecretExtractor().scan(extract_result["extracted_path"])
-    return {**extract_result, **secret_result}
+
+    logger.info(f"[firmware] Uploaded: {safe_name} ({os.path.getsize(file_path)} bytes)")
+
+    # Run CPU-bound extraction off the event loop
+    def _run_extraction():
+        extract_result = FirmwareExtractor(timeout=300).extract(file_path)
+        secret_result  = {}
+        if extract_result.get("success") and extract_result.get("extracted_path"):
+            secret_result = SecretExtractor().scan(extract_result["extracted_path"])
+        return {**extract_result, **secret_result}
+
+    result = await asyncio.to_thread(_run_extraction)
+    return result
 
 @app.get("/firmware/results/{filename}")
 async def firmware_results(filename: str):

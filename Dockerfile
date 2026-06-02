@@ -11,7 +11,21 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     golang-go \
     binwalk \
+    squashfs-tools \
+    mtd-utils \
+    liblzma-dev \
+    zlib1g-dev \
+    liblzo2-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Firmware analysis Python tools
+# ubireader: UBI/UBIFS extraction (fixes "ubireader_extract_files not found")
+# jefferson: JFFS2 filesystem extraction
+# cstruct: ubireader dependency
+RUN pip install --no-cache-dir \
+    ubi_reader \
+    jefferson \
+    cstruct
 
 WORKDIR /app
 
