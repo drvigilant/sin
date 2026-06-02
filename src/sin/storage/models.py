@@ -115,6 +115,9 @@ class DeviceBaseline(Base):
     baseline_risk_score    = Column(Integer, nullable=True)
     baseline_jarm_hash     = Column(String,  nullable=True)
 
+    # Rolling risk score — updated every scan so detect_drift() can diff scan-to-scan
+    last_risk_score = Column(Integer, nullable=True)
+
     # Lifecycle
     created_at  = Column(DateTime, default=datetime.utcnow)
     updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

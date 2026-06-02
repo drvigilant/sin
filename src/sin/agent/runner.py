@@ -133,6 +133,44 @@ class AgentRunner:
     def _process_asset(self, asset: Dict) -> Dict:
         ip = asset.get("ip_address", "?")
 
+        # ── Stage 0: MAC + OUI resolution ────────────────────────────────────
+        # Runs first so audit engine has accurate vendor/MAC context
+        try:
+            from sin.scanner.mac_resolver import MACResolver
+            mac_data = MACResolver().resolve(ip)
+            if mac_data.get("mac_address") and mac_data["mac_address"] != "Unknown":
+                if not asset.get("mac_address") or asset["mac_address"] in ("Unknown", "", None):
+                    asset["mac_address"] = mac_data["mac_address"]
+            # OUI vendor enriches manufacturer when Go sensor missed it
+            if mac_data.get("vendor") and mac_data["vendor"] != "Unknown":
+                if not asset.get("manufacturer") or asset["manufacturer"] in ("Unknown", "", None):
+                    asset["manufacturer"] = mac_data["vendor"]
+                    asset["vendor"] = mac_data["vendor"]
+        except Exception as exc:
+            logger.debug(f"[runner] MAC resolve failed {ip}: {exc}")
+
+        # ── Stage 0b: SNMP telemetry (port 161 if open, or try anyway) ──────
+        # Provides: sysDescr, sysName, uptime, CPU%, storage — zero auth needed
+        try:
+            from sin.scanner.snmp_telemetry import SNMPTelemetryProber
+            snmp_data = SNMPTelemetryProber().probe(ip, asset.get("open_ports", []))
+            if snmp_data:
+                asset["snmp_telemetry"] = snmp_data
+                # Enrich hostname if SNMP has it and we don't
+                if snmp_data.get("hostname") and asset.get("hostname") in (None, "Unknown", ""):
+                    asset["hostname"] = snmp_data["hostname"]
+                # Enrich description / OS hint
+                if snmp_data.get("description"):
+                    asset.setdefault("snmp_description", snmp_data["description"])
+                logger.info(
+                    f"[runner] SNMP {ip} → "
+                    f"host={snmp_data.get('hostname','?')} "
+                    f"cpu={snmp_data.get('cpu_percent','?')}% "
+                    f"uptime={snmp_data.get('uptime_human','?')}"
+                )
+        except Exception as exc:
+            logger.debug(f"[runner] SNMP probe failed {ip}: {exc}")
+
         # ── AuditEngine: evidence-based findings + calibrated score ───────────
         vulns, audit_score, _audit_action = self.auditor.evaluate_asset(asset)
         asset["vulnerabilities"] = vulns
@@ -144,17 +182,6 @@ class AgentRunner:
         for port, label in _DANGEROUS_PORTS.items():
             if port in set(ports):
                 _broadcast_ws("TRAFFIC_ALERT", {"anomaly": f"{ip} [{vendor}] — {label} (:{port})"})
-
-        # ── JARM TLS fingerprint (Phase 2.2) ──────────────────────────────────
-        # Runs on ports 443/8443 only — skipped if neither is open (fast path)
-        if not asset.get("jarm_hash") and ({443, 8443} & set(ports)):
-            try:
-                from sin.scanner.jarm import probe_jarm
-                jarm = probe_jarm(ip, ports)
-                if jarm:
-                    asset["jarm_hash"] = jarm
-            except Exception as e:
-                logger.debug(f"[jarm] {ip} probe error: {e}")
 
         # ── DecisionEngine: device-type damper + packet signal enrichment ─────
         # We do NOT use verdict.confidence as the final score — that path
@@ -184,9 +211,20 @@ class AgentRunner:
             "action":     verdict.recommended_action,
             "signals":    verdict.signal_count,
         }
-        auto_quarantine_critical = _policy_enabled("auto_quarantine_critical", True)
-        force_auto_quarantine = auto_quarantine_critical and asset.get("risk_score", 0) > 90
-        if verdict.is_actionable(_CONFIDENCE_THRESHOLD) or force_auto_quarantine:
+        # ── Quarantine gate — THREE conditions must ALL be true ──────────────
+        # 1. SIN_AUTO_QUARANTINE env var must be "true" (default: false for safety)
+        # 2. Redis policy auto_quarantine_critical must be enabled
+        # 3. DecisionEngine verdict must be actionable at threshold
+        # This triple-gate prevents cameras from being isolated during testing
+        # or when the operator has disabled auto-response.
+        _env_quarantine    = os.getenv("SIN_AUTO_QUARANTINE", "false").lower() == "true"
+        auto_quarantine_critical = _policy_enabled("auto_quarantine_critical", False)
+        force_auto_quarantine = (
+            _env_quarantine and
+            auto_quarantine_critical and
+            asset.get("risk_score", 0) > 90
+        )
+        if _env_quarantine and (verdict.is_actionable(_CONFIDENCE_THRESHOLD) or force_auto_quarantine):
             try:
                 result = self.mitigation.isolate(asset, verdict)
                 asset["mitigation_rule_id"] = result.rule_id
@@ -209,7 +247,9 @@ class AgentRunner:
             db.flush()
             for asset in assets:
                 ip = asset.get("ip_address", "")
-                db.add(models.DeviceLog(scan_id=session_row.id, ip_address=ip, hostname=asset.get("hostname"), status="online", vendor=asset.get("manufacturer") or asset.get("vendor"), os_family=asset.get("os_family"), open_ports=asset.get("open_ports",[]), protocols=list(asset.get("services",{}).values()), vulnerabilities=asset.get("vulnerabilities",[]), mac_address=asset.get("mac_address"), device_type=asset.get("device_type"), firmware=asset.get("firmware"), serial_number=asset.get("serial") or asset.get("serial_number"), model=asset.get("model"), risk_score=asset.get("risk_score",0), risk_level=asset.get("risk_level","UNKNOWN"), risk_reasons=asset.get("risk_reasons",[]), jarm_hash=asset.get("jarm_hash"), telemetry=asset.get("telemetry",{})))
+                # Merge SNMP telemetry into the telemetry JSON field
+                telemetry = {**(asset.get("telemetry") or {}), **(asset.get("snmp_telemetry") or {})}
+                db.add(models.DeviceLog(scan_id=session_row.id, ip_address=ip, hostname=asset.get("hostname"), status="online", vendor=asset.get("manufacturer") or asset.get("vendor"), os_family=asset.get("os_family"), open_ports=asset.get("open_ports",[]), protocols=list(asset.get("services",{}).values()), vulnerabilities=asset.get("vulnerabilities",[]), mac_address=asset.get("mac_address"), device_type=asset.get("device_type"), firmware=asset.get("firmware"), serial_number=asset.get("serial") or asset.get("serial_number"), model=asset.get("model"), risk_score=asset.get("risk_score",0), risk_level=asset.get("risk_level","UNKNOWN"), risk_reasons=asset.get("risk_reasons",[]), jarm_hash=asset.get("jarm_hash"), telemetry=telemetry))
                 for vuln in asset.get("vulnerabilities", []):
                     description = f"[{vuln.get('cve','N/A')}] {vuln.get('type','Unknown')}: {vuln.get('description','')}"
                     exists = db.query(models.SecurityEvent).filter(models.SecurityEvent.ip_address == ip, models.SecurityEvent.description == description).first()

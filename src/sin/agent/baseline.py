@@ -40,9 +40,9 @@ class BaselineEngine:
 
     def snapshot(self, device: Dict, db: Session) -> None:
         """
-        Store a golden-state baseline for the device.
-        Called on first discovery; does NOT overwrite an existing baseline.
-        The session is NOT committed here — caller owns the transaction.
+        Store or update baseline for the device.
+        First call: creates golden-state record.
+        Subsequent calls: updates last_risk_score only (preserves original baseline).
         """
         ip = device.get("ip_address", "")
         if not ip:
@@ -50,16 +50,19 @@ class BaselineEngine:
 
         existing = db.query(DeviceBaseline).filter_by(ip_address=ip).first()
         if existing:
-            return  # Baseline already exists — preserve the original golden state
+            existing.last_risk_score = device.get("risk_score", 0)
+            return
 
         cves = self._extract_cves(device)
+        risk = device.get("risk_score", 0)
         baseline = DeviceBaseline(
-            ip_address             = ip,
-            baseline_ports         = sorted(device.get("open_ports", [])),
-            baseline_vendor        = (device.get("manufacturer") or device.get("vendor") or "").strip(),
+            ip_address               = ip,
+            baseline_ports           = sorted(device.get("open_ports", [])),
+            baseline_vendor          = (device.get("manufacturer") or device.get("vendor") or "").strip(),
             baseline_vulnerabilities = cves,
-            baseline_risk_score    = device.get("risk_score", 0),
-            baseline_jarm_hash     = device.get("jarm_hash") or "",
+            baseline_risk_score      = risk,
+            last_risk_score          = risk,
+            baseline_jarm_hash       = device.get("jarm_hash") or "",
         )
         db.add(baseline)
         logger.info("📐 Baseline snapshot created for %s | ports=%s cves=%d",
@@ -154,6 +157,25 @@ class BaselineEngine:
 
         # ── Risk escalation ───────────────────────────────────────────────────
         current_risk = device.get("risk_score") or 0
+
+        # Scan-to-scan: compare vs last_risk_score (RISK_ESCALAT)
+        # Threshold: +10 pts = HIGH, +30 pts = CRITICAL
+        last_score = getattr(baseline, "last_risk_score", None)
+        if last_score is not None:
+            scan_delta = current_risk - last_score
+            if scan_delta >= 10:
+                sev = "CRITICAL" if scan_delta >= 30 else "HIGH"
+                events.append({
+                    "event_type":  "RISK_ESCALAT",
+                    "severity":    sev,
+                    "description": (
+                        f"[DRIFT] {ip}: Risk score rose {scan_delta} points "
+                        f"({last_score} → {current_risk}) since last scan."
+                    ),
+                })
+                logger.warning("🔀 DRIFT RISK_ESCALAT %s +%d sev=%s", ip, scan_delta, sev)
+
+        # vs original golden baseline (RISK_ESCALATED — unchanged behaviour)
         if baseline.baseline_risk_score is not None:
             delta = current_risk - baseline.baseline_risk_score
             if delta >= 25:
@@ -162,7 +184,7 @@ class BaselineEngine:
                     "severity":    "HIGH",
                     "description": (
                         f"[DRIFT] {ip}: Risk score rose {delta} points "
-                        f"({baseline.baseline_risk_score} → {current_risk}) vs baseline."
+                        f"({baseline.baseline_risk_score} → {current_risk}) vs original baseline."
                     ),
                 })
                 logger.warning("🔀 DRIFT RISK_ESCALATED %s +%d", ip, delta)

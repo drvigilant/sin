@@ -47,9 +47,10 @@ _DEVICE_LOG_NEW_COLUMNS = [
 # New columns for security_events (description widened to TEXT)
 _SECURITY_EVENT_NEW_COLUMNS: list = []  # description already TEXT in new installs
 
-# device_baselines table is created by create_all() — no ALTER TABLE needed.
-# Listed here for documentation; kept as empty list.
-_DEVICE_BASELINE_NEW_COLUMNS: list = []
+# New columns added to device_baselines post-initial-schema.
+_DEVICE_BASELINE_NEW_COLUMNS = [
+    ("last_risk_score", "INTEGER", None),
+]
 
 
 def _apply_migrations() -> None:
@@ -88,6 +89,33 @@ def _apply_migrations() -> None:
                 err = str(exc).lower()
                 if "duplicate column" in err or "already exists" in err:
                     logger.debug(f"Column device_logs.{col_name} already exists — skipped")
+                    conn.rollback()
+                else:
+                    logger.warning(f"Migration warning for {col_name}: {exc}")
+                    conn.rollback()
+
+        for col_name, col_type, col_default in _DEVICE_BASELINE_NEW_COLUMNS:
+            try:
+                if backend == "sqlite":
+                    ddl = f"ALTER TABLE device_baselines ADD COLUMN {col_name} {col_type}"
+                    if col_default:
+                        ddl += f" DEFAULT {col_default}"
+                else:
+                    ddl = (
+                        f"ALTER TABLE device_baselines "
+                        f"ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                    )
+                    if col_default:
+                        ddl += f" DEFAULT {col_default}"
+
+                conn.execute(__import__("sqlalchemy").text(ddl))
+                conn.commit()
+                logger.debug(f"Migration OK: device_baselines.{col_name}")
+
+            except Exception as exc:
+                err = str(exc).lower()
+                if "duplicate column" in err or "already exists" in err:
+                    logger.debug(f"Column device_baselines.{col_name} already exists — skipped")
                     conn.rollback()
                 else:
                     logger.warning(f"Migration warning for {col_name}: {exc}")
