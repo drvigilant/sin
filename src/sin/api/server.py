@@ -779,9 +779,18 @@ async def upload_firmware(file: UploadFile = File(...)):
     def _run_extraction():
         extract_result = FirmwareExtractor(timeout=300).extract(file_path)
         secret_result  = {}
+        sbom_result    = {}
         if extract_result.get("success") and extract_result.get("extracted_path"):
             secret_result = SecretExtractor().scan(extract_result["extracted_path"])
-        return {**extract_result, **secret_result}
+            try:
+                from sin.firmware.sbom_generator import SBOMGenerator
+                sbom_result = SBOMGenerator().generate(
+                    extract_result["extracted_path"],
+                    firmware_name=safe_name,
+                )
+            except Exception as e:
+                logger.warning(f"[sbom] generation failed: {e}")
+        return {**extract_result, **secret_result, **sbom_result}
 
     result = await asyncio.to_thread(_run_extraction)
     return result
