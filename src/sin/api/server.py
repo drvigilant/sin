@@ -621,14 +621,19 @@ async def ws_events(websocket: WebSocket):
     await ws_manager.connect(websocket)
 
 # ── Firmware Analysis Endpoints ──────────────────────────────────────────────
-import shutil
-from fastapi import UploadFile, File
 from sin.firmware.extractor import FirmwareExtractor
 from sin.firmware.secret_extractor import SecretExtractor
+from sin.firmware.sbom_generator import SBOMGenerator
+from sin.firmware.sbom_store import sbom_store
 
 _FIRMWARE_UPLOAD_DIR = "/var/lib/sin/firmware/uploads"
 os.makedirs(_FIRMWARE_UPLOAD_DIR, exist_ok=True)
 
+assert old in content, "import block not found"
+content = content.replace(old, new, 1)
+with open(path, "w") as f:
+    f.write(content)
+print("import ok")
 # ── Network Analyzer Endpoints ──────────────────────────────────────────────
 @app.get("/analyzer/flows")
 def get_traffic_flows(limit: int = 100):
@@ -790,10 +795,44 @@ async def upload_firmware(file: UploadFile = File(...)):
                 )
             except Exception as e:
                 logger.warning(f"[sbom] generation failed: {e}")
-        return {**extract_result, **secret_result, **sbom_result}
 
-    result = await asyncio.to_thread(_run_extraction)
-    return result
+ # Persist SBOM if generation succeeded
+    sbom_meta = {}
+    if sbom_result.get("sbom_success"):
+        try:
+            sbom_meta = sbom_store.save(file.filename, sbom_result)
+        except Exception as _e:
+            logger.warning(f"[firmware/upload] SBOM persist failed: {_e}")
+
+    return {**extract_result, **secret_result, **sbom_result,
+            "sbom_slug": sbom_meta.get("slug"), "sbom_saved": bool(sbom_meta)}
+
+
+@app.get("/firmware/sbom/")
+async def list_sboms():
+    """List all persisted SBOMs (meta only, no BOM body)."""
+    records = sbom_store.list_all()
+    return {"count": len(records), "sboms": records}
+
+
+@app.get("/firmware/sbom/{slug}")
+async def get_sbom(slug: str):
+    """Return the full CycloneDX 1.4 SBOM document for *slug*."""
+    doc = sbom_store.get(slug)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"SBOM not found: {slug}")
+    meta = sbom_store.get_meta(slug) or {}
+    return {"slug": slug, "meta": meta, "sbom": doc}
+
+
+@app.delete("/firmware/sbom/{slug}")
+async def delete_sbom(slug: str):
+    """Delete a persisted SBOM document."""
+    deleted = sbom_store.delete(slug)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"SBOM not found: {slug}")
+    return {"deleted": True, "slug": slug}
+
 
 @app.get("/firmware/results/{filename}")
 async def firmware_results(filename: str):
@@ -805,6 +844,11 @@ async def firmware_results(filename: str):
         files.extend(fs)
     return {"filename": filename, "file_count": len(files), "path": path}
 
+assert old in content, "Pattern not found"
+content = content.replace(old, new, 1)
+with open(path, "w") as f:
+    f.write(content)
+print("done")
 
 # ── AUTH ENDPOINTS ────────────────────────────────────────────────────────────
 from pydantic import BaseModel as _BM
