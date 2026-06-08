@@ -569,6 +569,55 @@ Return ONLY a valid JSON array. No markdown fences, no explanation:
         logger.error(f"Groq audit failed: {ex}")
         return {"error": str(ex), "findings": [], "model": "groq"}
 
+# ── Burn-in telemetry endpoints ───────────────────────────────────────────────
+
+@app.post("/hardware/burnin")
+async def start_burnin(request: Request):
+    """Start a burn-in session for a device."""
+    from sin.hardware.burnin import burnin_agent, BurninConfig
+    body = await request.json()
+    ip   = body.get("ip_address", "")
+    if not ip:
+        raise HTTPException(status_code=422, detail="ip_address required")
+    config = BurninConfig(
+        duration_s=int(body.get("duration_s", 3600)),
+        poll_interval_s=int(body.get("poll_interval_s", 30)),
+    )
+    try:
+        config.validate()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    session_id = burnin_agent.start(ip, config)
+    return {"session_id": session_id, "ip": ip, "status": "running"}
+
+
+@app.get("/hardware/burnin")
+async def list_burnin():
+    """List all burn-in sessions."""
+    from sin.hardware.burnin import burnin_agent
+    return {"sessions": burnin_agent.list_sessions()}
+
+
+@app.get("/hardware/burnin/{session_id}")
+async def get_burnin(session_id: str):
+    """Get current report for a burn-in session."""
+    from sin.hardware.burnin import burnin_agent
+    try:
+        return burnin_agent.report(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@app.post("/hardware/burnin/{session_id}/stop")
+async def stop_burnin(session_id: str):
+    """Stop a running burn-in session and return final report."""
+    from sin.hardware.burnin import burnin_agent
+    try:
+        return burnin_agent.stop(session_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
 @app.post("/ai/investigate")
 async def ai_investigate(request: OllamaAuditRequest):
     """
