@@ -1,5 +1,6 @@
 from sin.health import check_all
 from fastapi import FastAPI, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
+from sin.api.auth import require_admin, require_analyst, require_viewer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -169,7 +170,7 @@ def get_db():
     finally:
         db.close()
 # In server.py
-@app.delete("/devices/purge-non-iot")
+@app.delete("/devices/purge-non-iot", dependencies=[Depends(require_admin)])
 def purge_non_iot_devices(dry_run: bool = True, db: Session = Depends(get_db)):
     """Remove device_logs for IPs whose hostname matches non-IoT patterns.
 
@@ -706,7 +707,7 @@ async def ollama_status():
 def agent_status():
     return {"running": True}
 
-@app.post("/agent/isolate/{ip}")
+@app.post("/agent/isolate/{ip}", dependencies=[Depends(require_admin)])
 def isolate_device(ip: str, db: Session = Depends(get_db)):
     if _sin_agent is None:
         raise HTTPException(503, "Agent not running")
@@ -721,13 +722,13 @@ def isolate_device(ip: str, db: Session = Depends(get_db)):
     _reg.mark_mitigated(ip)
     return {"status": "queued", "ip": ip, "task_id": task.id, "mac": mac}
 
-@app.post("/agent/whitelist/{ip}")
+@app.post("/agent/whitelist/{ip}", dependencies=[Depends(require_admin)])
 def whitelist_device(ip: str):
     from sin.storage.registry import DeviceRegistry
     DeviceRegistry().whitelist(ip)
     return {"status": "whitelisted", "ip": ip}
 
-@app.delete("/agent/isolate/{ip}")
+@app.delete("/agent/isolate/{ip}", dependencies=[Depends(require_admin)])
 def lift_device(ip: str):
     from sin.tasks.celery_app import celery_app as _celery
     task = _celery.send_task("lift_quarantine", args=[ip])
@@ -943,7 +944,7 @@ async def get_sbom(slug: str):
     return {"slug": slug, "meta": meta, "sbom": doc}
 
 
-@app.delete("/firmware/sbom/{slug}")
+@app.delete("/firmware/sbom/{slug}", dependencies=[Depends(require_admin)])
 async def delete_sbom(slug: str):
     """Delete a persisted SBOM document."""
     deleted = sbom_store.delete(slug)
