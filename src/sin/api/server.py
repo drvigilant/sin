@@ -10,6 +10,7 @@ import asyncio
 import httpx
 import json
 import os
+import shutil
 import redis.asyncio as aioredis
 
 from sin.utils.logger import get_logger
@@ -131,7 +132,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("SIN_ALLOWED_ORIGINS", "http://localhost,http://localhost:8501").split(","),
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["X-API-Key", "Content-Type"],
+    allow_headers=["X-API-Key", "Content-Type", "Authorization"],
 )
 
 @app.middleware("http")
@@ -152,8 +153,9 @@ async def api_key_middleware(request: Request, call_next):
                 payload = decode_token(auth_header[7:])
                 if payload.get("type") == "access":
                     return await call_next(request)
-            except Exception:
-                pass
+            except Exception as _jwt_exc:
+                import logging
+                logging.getLogger("sin.api.auth").error("JWT middleware exception: %s", _jwt_exc)
         return JSONResponse(
             status_code=401,
             content={"error": "Unauthorized", "detail": "Missing or invalid X-API-Key header"},
@@ -901,21 +903,28 @@ async def upload_firmware(file: UploadFile = File(...)):
 
     # Run CPU-bound extraction off the event loop
     def _run_extraction():
-        extract_result = FirmwareExtractor(timeout=300).extract(file_path)
-        secret_result  = {}
-        sbom_result    = {}
-        if extract_result.get("success") and extract_result.get("extracted_path"):
-            secret_result = SecretExtractor().scan(extract_result["extracted_path"])
+        _extract = FirmwareExtractor(timeout=300).extract(file_path)
+        _secrets = {}
+        _sbom    = {}
+        if _extract.get("success") and _extract.get("extracted_path"):
+            _secrets = SecretExtractor().scan(_extract["extracted_path"])
             try:
                 from sin.firmware.sbom_generator import SBOMGenerator
-                sbom_result = SBOMGenerator().generate(
-                    extract_result["extracted_path"],
+                _sbom = SBOMGenerator().generate(
+                    _extract["extracted_path"],
                     firmware_name=safe_name,
                 )
             except Exception as e:
                 logger.warning(f"[sbom] generation failed: {e}")
+        return _extract, _secrets, _sbom
 
- # Persist SBOM if generation succeeded
+    import asyncio
+    loop = asyncio.get_event_loop()
+    extract_result, secret_result, sbom_result = await loop.run_in_executor(
+        None, _run_extraction
+    )
+
+    # Persist SBOM if generation succeeded
     sbom_meta = {}
     if sbom_result.get("sbom_success"):
         try:
