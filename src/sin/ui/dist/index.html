@@ -1665,11 +1665,19 @@ async function fwUpload(){
   try{
     const form = new FormData();
     form.append('file', fwFile);
-    const r = await fetch(API + '/firmware/upload', {
+    let r = await fetch(API + '/firmware/upload', {
       method: 'POST',
       headers: {'Authorization': 'Bearer ' + JWT_TOKEN},
       body: form
     });
+    if(r.status === 401 && REFRESH_TOKEN) {
+      try {
+        const rr = await fetch(API+'/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:REFRESH_TOKEN})});
+        if(rr.ok){const d=await rr.json();JWT_TOKEN=d.access_token;REFRESH_TOKEN=d.refresh_token;localStorage.setItem('sin_jwt',JWT_TOKEN);localStorage.setItem('sin_refresh',REFRESH_TOKEN);
+          const form2=new FormData();form2.append('file',fwFile);
+          r=await fetch(API+'/firmware/upload',{method:'POST',headers:{'Authorization':'Bearer '+JWT_TOKEN},body:form2});}
+      } catch(e){}
+    }
     if(r.status === 401){showAuth('Session expired.');return;}
     if(r.status === 413){
       clearInterval(tick);

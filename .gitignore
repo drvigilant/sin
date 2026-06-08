@@ -56,7 +56,7 @@ docker-compose.override.yml
 logs/
 
 # ── Distribution whitelisting ─────────────────────────────────────
-dist/*
+build/dist/*
 !src/sin/ui/dist/index.html
 .aider*
 .env
