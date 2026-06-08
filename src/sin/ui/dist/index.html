@@ -399,6 +399,62 @@ tbody .sev-INFO { color: var(--text3); }
 .ft-item span { color: var(--text2); }
 .ft-sep { color: var(--border2); font-size: 11px; }
 .footer-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+/* ── AI INVESTIGATOR ── */
+.ai-invest-layout { flex: 1; display: grid; grid-template-columns: 300px 1fr; overflow: hidden; min-height: 0; }
+.ai-invest-ctrl { border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; background: var(--surface); }
+.ai-invest-results { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ai-phase { background: var(--surface); border: 1px solid var(--border); }
+.ai-phase-hdr { height: 36px; padding: 0 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.ai-phase-title { font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text2); }
+.ai-phase-badge { font-size: 9px; color: var(--text3); margin-left: auto; padding: 2px 7px; border: 1px solid var(--border2); }
+.ai-phase-body { padding: 14px; }
+.ai-tool-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid var(--border2); font-size: 9px; margin: 3px; background: var(--bg); color: var(--text2); }
+.ai-tool-chip.ok  { color: var(--green);  border-color: rgba(16,185,129,0.35); background: var(--green-dim); }
+.ai-tool-chip.timeout { color: var(--amber); border-color: rgba(245,158,11,0.35); background: var(--amber-dim); }
+.ai-tool-chip.error { color: var(--red); border-color: rgba(217,83,79,0.35); background: var(--red-dim); }
+.ai-narrative { font-size: 12px; color: var(--text); line-height: 1.75; background: var(--surface2); border: 1px solid var(--border2); padding: 14px 16px; border-left: 3px solid var(--accent); margin-bottom: 10px; }
+.ai-chain-step { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(30,35,48,0.5); font-size: 11px; color: var(--text2); align-items: flex-start; }
+.ai-chain-step:last-child { border-bottom: none; }
+.ai-chain-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.ai-verdict-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; border: 1px solid; margin-bottom: 12px; }
+.ai-verdict-CRITICAL,.ai-verdict-HIGH { color: var(--red); border-color: rgba(217,83,79,0.35); background: var(--red-dim); }
+.ai-verdict-MEDIUM { color: var(--amber); border-color: rgba(245,158,11,0.35); background: var(--amber-dim); }
+.ai-verdict-LOW   { color: var(--green); border-color: rgba(16,185,129,0.35); background: var(--green-dim); }
+.ai-verdict-UNKNOWN { color: var(--text3); border-color: var(--border2); background: var(--surface2); }
+/* ── BURN-IN LAB ── */
+.burnin-layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.burnin-form-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; flex-wrap: wrap; }
+.burnin-form-label { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3); font-family: var(--font-ui); font-weight: 600; white-space: nowrap; }
+.burnin-inp { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; font-size: 12px; font-family: var(--font-data); outline: none; width: 150px; }
+.burnin-inp:focus { border-color: var(--accent); }
+.burnin-sel { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; font-size: 11px; font-family: var(--font-data); outline: none; }
+.burnin-start-btn { padding: 8px 18px; background: var(--green-dim); border: 1px solid var(--green); color: var(--green); font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.burnin-start-btn:hover { background: var(--green-glow); }
+.burnin-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.burnin-sessions { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.burnin-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--text3); padding: 14px 16px; }
+.burnin-card.PASS { border-left-color: var(--green); }
+.burnin-card.FAIL { border-left-color: var(--red); }
+.burnin-card.WARNING { border-left-color: var(--amber); }
+.burnin-card.PENDING,.burnin-card.running { border-left-color: var(--accent); }
+.burnin-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.burnin-card-ip { font-size: 14px; font-weight: 500; }
+.burnin-verdict { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; padding: 2px 8px; border: 1px solid; }
+.burnin-verdict.PASS    { color: var(--green);  border-color: rgba(16,185,129,0.35); background: var(--green-dim); }
+.burnin-verdict.FAIL    { color: var(--red);    border-color: rgba(217,83,79,0.35);  background: var(--red-dim); }
+.burnin-verdict.WARNING { color: var(--amber);  border-color: rgba(245,158,11,0.35); background: var(--amber-dim); }
+.burnin-verdict.PENDING,.burnin-verdict.running { color: var(--accent); border-color: rgba(59,130,246,0.35); background: var(--accent-dim); }
+.burnin-prog-track { height: 3px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; margin-bottom: 5px; }
+.burnin-prog-fill { height: 100%; background: var(--accent); transition: width 0.5s; }
+.burnin-metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin: 10px 0 8px; }
+.burnin-metric { background: var(--bg); border: 1px solid var(--border); padding: 8px 10px; }
+.burnin-metric-label { font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); font-family: var(--font-ui); margin-bottom: 4px; }
+.burnin-metric-val { font-size: 18px; font-weight: 400; color: var(--text); }
+.burnin-issues { font-size: 10px; color: var(--red); margin-top: 6px; }
+.burnin-warnings-txt { font-size: 10px; color: var(--amber); margin-top: 4px; }
+.burnin-stop-btn { padding: 4px 12px; border: 1px solid rgba(217,83,79,0.35); color: var(--red); background: var(--red-dim); font-family: var(--font-ui); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; margin-left: auto; }
+
 </style>
 </head>
 <body>
@@ -472,6 +528,14 @@ tbody .sev-INFO { color: var(--text3); }
       <div class="nav-section">Control</div>
       <div class="nav-item" data-page="policies">
         <i class="fas fa-shield-alt"></i><span>Policy Engine</span>
+      </div>
+      <div class="nav-section">Intelligence</div>
+      <div class="nav-item" data-page="ai-investigate">
+        <i class="fas fa-robot"></i><span>AI Investigator</span>
+      </div>
+      <div class="nav-section">Hardware</div>
+      <div class="nav-item" data-page="burnin">
+        <i class="fas fa-thermometer-half"></i><span>Burn-in Lab</span>
       </div>
       <div class="nav-section">Forensics</div>
       <div class="nav-item" data-page="firmware">
@@ -776,6 +840,75 @@ tbody .sev-INFO { color: var(--text3); }
       </div>
     </div>
 
+
+    <!-- AI INVESTIGATOR -->
+    <div class="page" id="page-ai-investigate">
+      <div class="ai-invest-layout">
+        <div class="ai-invest-ctrl">
+          <div>
+            <div class="isect-title" style="margin-top:0;border-bottom:none;padding-bottom:0;">Target Device</div>
+            <select class="filter-inp" id="ai-device-select" style="width:100%;margin-bottom:8px;padding:7px 10px;" onchange="aiDeviceSelected(this)">
+              <option value="">— Select from device list —</option>
+            </select>
+            <div style="font-size:9px;color:var(--text3);margin-bottom:6px;text-align:center;">or enter IP manually</div>
+            <input class="filter-inp" id="ai-ip-input" placeholder="192.168.30.x" style="width:100%;margin-bottom:12px;">
+            <button id="ai-invest-btn" onclick="runInvestigation()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);font-family:var(--font-ui);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;">
+              <i class="fas fa-robot" style="font-size:11px;"></i><span>Investigate</span>
+            </button>
+          </div>
+          <div id="ai-invest-info" style="font-size:9px;color:var(--text3);line-height:1.7;padding:10px;border:1px solid var(--border);background:var(--bg);">
+            <div style="color:var(--text2);margin-bottom:6px;font-family:var(--font-ui);font-weight:600;font-size:10px;">HOW IT WORKS</div>
+            Round 1 — AI plans which scanner tools to run.<br>
+            Round 2 — Python executes tools against the device.<br>
+            Round 3 — AI synthesizes an attack narrative.
+          </div>
+        </div>
+        <div class="ai-invest-results" id="ai-invest-results">
+          <div class="fw-empty">
+            <i class="fas fa-robot"></i>
+            <div>AI Investigator</div>
+            <div style="margin-top:6px;font-size:9px;">Select a device and click Investigate.<br>The AI will reason over live scanner data and produce<br>an attack narrative — not just a finding list.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BURN-IN LAB -->
+    <div class="page" id="page-burnin">
+      <div class="burnin-layout">
+        <div class="pane-header">
+          <i class="fas fa-thermometer-half" style="color:var(--green);font-size:10px;"></i>
+          <span class="pane-title">Burn-in Lab</span>
+          <div class="pane-meta"><span class="chip" id="burnin-session-count">0 SESSIONS</span></div>
+        </div>
+        <div class="burnin-form-row">
+          <span class="burnin-form-label">Target IP</span>
+          <input class="burnin-inp" id="burnin-ip" placeholder="192.168.30.x">
+          <span class="burnin-form-label">Duration</span>
+          <select class="burnin-sel" id="burnin-duration">
+            <option value="300">5 min (test)</option>
+            <option value="3600" selected>1 hour</option>
+            <option value="14400">4 hours</option>
+            <option value="28800">8 hours</option>
+            <option value="86400">24 hours</option>
+          </select>
+          <span class="burnin-form-label">Poll every</span>
+          <select class="burnin-sel" id="burnin-interval">
+            <option value="10">10s (debug)</option>
+            <option value="30" selected>30s</option>
+            <option value="60">1 min</option>
+            <option value="120">2 min</option>
+          </select>
+          <button class="burnin-start-btn" onclick="startBurnin()">
+            <i class="fas fa-play" style="margin-right:6px;font-size:9px;"></i>Start Burn-in
+          </button>
+        </div>
+        <div class="burnin-sessions" id="burnin-sessions">
+          <div style="color:var(--text3);font-size:10px;padding:20px;text-align:center;letter-spacing:0.1em;">NO SESSIONS — CONFIGURE AND START A BURN-IN ABOVE</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app-shell -->
 
@@ -812,7 +945,7 @@ const POLICY_META={
   strict_whitelist_mode:{name:'Strict Whitelist Mode',desc:'Block all network access from endpoints not explicitly whitelisted in the registry.'},
   network_discovery_enabled:{name:'Network Discovery',desc:'Allow the SIN engine to perform automatic subnet discovery scans on the configured interval.'}
 };
-const PAGE_TITLES={edr:'EDR Overview',analytics:'SOC Analytics',threats:'Threat Intel',network:'Network Analyzer',incidents:'Incident Log',policies:'Policy Engine',firmware:'Firmware Lab'};
+const PAGE_TITLES={edr:'EDR Overview',analytics:'SOC Analytics',threats:'Threat Intel',network:'Network Analyzer',incidents:'Incident Log',policies:'Policy Engine',firmware:'Firmware Lab','ai-investigate':'AI Investigator',burnin:'Burn-in Lab'};
 
 const pad=n=>String(n).padStart(2,'0');
 function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -881,6 +1014,8 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
     document.getElementById('page-'+id).classList.add('active');
     document.getElementById('page-title').textContent=PAGE_TITLES[id]||'';
     if(id==='analytics')renderAnalytics();
+    if(id==='ai-investigate')_populateAiSelector();
+    if(id==='burnin')loadBurninSessions();
     if(id==='network'){flushBufs();}
     if(id==='threats')loadThreats();
     if(id==='incidents')loadIncidents();
@@ -1737,6 +1872,224 @@ function renderFwResults(entry){
     results.querySelectorAll('.fw-ft-fill').forEach(f=>{f.style.width=f.getAttribute('data-w')+'%';});
   });
 }
+
+// ══ AI INVESTIGATOR ══════════════════════════════════════════════════════════
+let _aiRunning = false;
+
+function aiDeviceSelected(sel) {
+  if(sel.value) document.getElementById('ai-ip-input').value = sel.value;
+}
+
+function _populateAiSelector() {
+  const sel = document.getElementById('ai-device-select');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Select from device list —</option>' +
+    devices.map(d => `<option value="${esc(d.ip_address)}">${esc(d.ip_address)} · ${esc((d.vendor||'Unknown').substring(0,14).toUpperCase())}</option>`).join('');
+  if(current) sel.value = current;
+}
+
+async function runInvestigation() {
+  if(_aiRunning) return;
+  const ip = (document.getElementById('ai-ip-input').value || '').trim();
+  if(!ip) { alert('Enter a target IP address first.'); return; }
+
+  _aiRunning = true;
+  const btn = document.getElementById('ai-invest-btn');
+  const results = document.getElementById('ai-invest-results');
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="font-size:10px;"></i><span>Investigating...</span>';
+  btn.disabled = true;
+
+  results.innerHTML = `
+    <div class="ai-phase">
+      <div class="ai-phase-hdr"><i class="fas fa-circle-notch fa-spin" style="color:var(--accent);font-size:9px;"></i><span class="ai-phase-title">Round 1 — Planning</span></div>
+      <div class="ai-phase-body" style="color:var(--text3);font-size:10px;">AI selecting scanner tools for ${esc(ip)}...</div>
+    </div>`;
+
+  try {
+    const report = await api('/ai/investigate', {
+      method: 'POST',
+      body: JSON.stringify({ ip_address: ip, open_ports: [], vulnerabilities: [] })
+    });
+
+    const adv = report.advisory || {};
+    const steps = report.investigation_steps || [];
+    const verdict = adv.risk_verdict || 'UNKNOWN';
+    const narrative = adv.attack_narrative || 'No narrative available.';
+    const chain = adv.attack_chain || [];
+    const findings = adv.confirmed_findings || [];
+    const actions = adv.recommended_actions || [];
+
+    // Tool evidence chips
+    const toolsHtml = steps.length === 0
+      ? '<span style="color:var(--text3);font-size:10px;">No tools executed (empty plan).</span>'
+      : steps.map(s => `<span class="ai-tool-chip ${s.status}">
+          <i class="fas fa-${s.status==='ok'?'check':s.status==='timeout'?'clock':'times'}" style="font-size:8px;"></i>
+          ${esc(s.tool)} <span style="color:var(--text3);margin-left:3px;">${s.duration_ms}ms</span>
+        </span>`).join('');
+
+    // Attack chain steps
+    const chainHtml = chain.length === 0
+      ? '<span style="color:var(--text3);font-size:10px;">No attack chain identified.</span>'
+      : chain.map((step, i) => `<div class="ai-chain-step"><div class="ai-chain-num">${i+1}</div><div>${esc(step)}</div></div>`).join('');
+
+    // Confirmed findings
+    const findingsHtml = findings.length === 0
+      ? '<div style="color:var(--green);font-size:11px;padding:4px 0;">✓ No additional findings from investigation.</div>'
+      : findings.map(f => `<div class="vuln-card ${esc(f.severity||'LOW')}" style="margin-bottom:7px;">
+          <div class="vuln-head">
+            <span class="vuln-cve">${esc(f.type||'Finding')}</span>
+            ${f.cve?`<span class="vtag ${esc(f.severity||'LOW')}" style="font-size:9px;">${esc(f.cve)}</span>`:''}
+            <span class="vtag ${esc(f.severity||'LOW')}">${esc(f.severity||'?')}</span>
+            <span style="font-size:9px;color:var(--text3);margin-left:auto;">${esc(f.source||'ai')}</span>
+          </div>
+          <div class="vuln-desc">${esc(f.description||'')}</div>
+        </div>`).join('');
+
+    // Recommended actions
+    const actionsHtml = actions.length === 0 ? '' : `
+      <div class="ai-phase">
+        <div class="ai-phase-hdr"><i class="fas fa-clipboard-check" style="color:var(--green);font-size:9px;"></i><span class="ai-phase-title">Recommended Actions</span></div>
+        <div class="ai-phase-body"><div style="display:flex;flex-direction:column;gap:6px;">
+          ${actions.map(a=>`<div style="font-size:11px;color:var(--text2);padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--green);">▸ ${esc(a)}</div>`).join('')}
+        </div></div>
+      </div>`;
+
+    results.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <div class="ai-verdict-badge ai-verdict-${esc(verdict)}">● ${esc(verdict)} RISK</div>
+        <span style="font-size:10px;color:var(--text3);">${esc(report.ip)} · ${esc(report.vendor||'Unknown')} · ${steps.length} tools · ${report.rounds} AI rounds</span>
+      </div>
+
+      <div class="ai-phase">
+        <div class="ai-phase-hdr"><i class="fas fa-tools" style="color:var(--accent);font-size:9px;"></i><span class="ai-phase-title">Evidence Gathered</span><span class="ai-phase-badge">${steps.length} tools</span></div>
+        <div class="ai-phase-body">${toolsHtml}</div>
+      </div>
+
+      <div class="ai-phase">
+        <div class="ai-phase-hdr"><i class="fas fa-scroll" style="color:var(--red);font-size:9px;"></i><span class="ai-phase-title">Attack Narrative</span></div>
+        <div class="ai-phase-body"><div class="ai-narrative">${esc(narrative)}</div>
+          <div class="isect-title" style="margin-top:4px;">Attack Chain</div>
+          ${chainHtml}
+        </div>
+      </div>
+
+      <div class="ai-phase">
+        <div class="ai-phase-hdr"><i class="fas fa-bug" style="color:var(--amber);font-size:9px;"></i><span class="ai-phase-title">Confirmed Findings</span><span class="ai-phase-badge">${findings.length}</span></div>
+        <div class="ai-phase-body">${findingsHtml}</div>
+      </div>
+
+      ${actionsHtml}
+    `;
+
+  } catch(e) {
+    results.innerHTML = `<div style="color:var(--red);padding:20px;font-size:11px;">Investigation failed: ${esc(e.message)}</div>`;
+  } finally {
+    _aiRunning = false;
+    btn.innerHTML = '<i class="fas fa-robot" style="font-size:10px;"></i><span>Investigate Again</span>';
+    btn.disabled = false;
+  }
+}
+
+// ══ BURN-IN LAB ═══════════════════════════════════════════════════════════════
+let _burninPoll = null;
+
+async function startBurnin() {
+  const ip = (document.getElementById('burnin-ip').value || '').trim();
+  if(!ip) { alert('Enter a target IP address.'); return; }
+  const duration = parseInt(document.getElementById('burnin-duration').value);
+  const poll = parseInt(document.getElementById('burnin-interval').value);
+  try {
+    await api('/hardware/burnin', {
+      method: 'POST',
+      body: JSON.stringify({ ip_address: ip, duration_s: duration, poll_interval_s: poll })
+    });
+    document.getElementById('burnin-ip').value = '';
+    loadBurninSessions();
+    if(!_burninPoll) _burninPoll = setInterval(loadBurninSessions, 15000);
+  } catch(e) { if(e.message !== '401') console.error('burnin start:', e); }
+}
+
+async function stopBurnin(sid) {
+  try {
+    await api('/hardware/burnin/' + sid + '/stop', { method: 'POST' });
+    loadBurninSessions();
+  } catch(e) { if(e.message !== '401') console.error('burnin stop:', e); }
+}
+
+async function loadBurninSessions() {
+  try {
+    const r = await api('/hardware/burnin');
+    const sessions = r.sessions || [];
+    const el = document.getElementById('burnin-sessions');
+    const countEl = document.getElementById('burnin-session-count');
+    if(countEl) countEl.textContent = sessions.length + ' SESSION' + (sessions.length !== 1 ? 'S' : '');
+    if(!sessions.length) {
+      el.innerHTML = '<div style="color:var(--text3);font-size:10px;padding:20px;text-align:center;letter-spacing:0.1em;">NO SESSIONS — CONFIGURE AND START A BURN-IN ABOVE</div>';
+      if(_burninPoll && !sessions.some(s=>s.status==='running')) { clearInterval(_burninPoll); _burninPoll=null; }
+      return;
+    }
+
+    // For each session, fetch full report for metrics
+    el.innerHTML = '';
+    for(const s of sessions) {
+      try {
+        const rep = await api('/hardware/burnin/' + s.session_id);
+        el.appendChild(renderBurninCard(rep));
+      } catch(e) {}
+    }
+    const anyRunning = sessions.some(s=>s.status==='running');
+    if(anyRunning && !_burninPoll) _burninPoll = setInterval(loadBurninSessions, 15000);
+    if(!anyRunning && _burninPoll) { clearInterval(_burninPoll); _burninPoll = null; }
+  } catch(e) { if(e.message !== '401') console.error('burnin load:', e); }
+}
+
+function renderBurninCard(rep) {
+  const card = document.createElement('div');
+  const verdict = rep.verdict || 'PENDING';
+  const status = rep.status || 'running';
+  card.className = 'burnin-card ' + (status === 'running' ? 'running' : verdict);
+
+  const latest = rep.latest || {};
+  const cpu = latest.cpu_percent != null ? latest.cpu_percent.toFixed(1) + '%' : '—';
+  const mem = latest.memory_percent != null ? latest.memory_percent.toFixed(1) + '%' : '—';
+  const uptime = latest.uptime_s != null ? fmtUptime(latest.uptime_s) : '—';
+  const rtt = latest.response_time_ms != null ? latest.response_time_ms + 'ms' : '—';
+  const pct = rep.progress_pct || 0;
+
+  const failsHtml = (rep.failures||[]).map(f=>`<div class="burnin-issues">✗ ${esc(f)}</div>`).join('');
+  const warnsHtml = (rep.warnings||[]).map(w=>`<div class="burnin-warnings-txt">⚠ ${esc(w)}</div>`).join('');
+
+  card.innerHTML = `
+    <div class="burnin-card-head">
+      <span class="burnin-card-ip">${esc(rep.ip||'?')}</span>
+      <span class="burnin-verdict ${verdict}">${esc(verdict)}</span>
+      <span style="font-size:9px;color:var(--text3);margin-left:4px;">${esc(status.toUpperCase())}</span>
+      ${status === 'running' ? `<button class="burnin-stop-btn" onclick="stopBurnin('${esc(rep.session_id)}')">■ Stop</button>` : ''}
+    </div>
+    <div class="burnin-prog-track"><div class="burnin-prog-fill" style="width:${pct}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:8px;">
+      <span>${pct.toFixed(1)}% complete</span>
+      <span>${rep.samples_collected||0} samples</span>
+      <span>${rep.remaining_s > 0 ? fmtUptime(rep.remaining_s) + ' remaining' : 'done'}</span>
+    </div>
+    <div class="burnin-metrics">
+      <div class="burnin-metric"><div class="burnin-metric-label">CPU Load</div><div class="burnin-metric-val" style="color:${latest.cpu_percent>80?'var(--red)':latest.cpu_percent>50?'var(--amber)':'var(--green)'}">${cpu}</div></div>
+      <div class="burnin-metric"><div class="burnin-metric-label">Memory</div><div class="burnin-metric-val" style="color:${latest.memory_percent>90?'var(--red)':'var(--text)'}">${mem}</div></div>
+      <div class="burnin-metric"><div class="burnin-metric-label">Uptime</div><div class="burnin-metric-val" style="font-size:13px;">${uptime}</div></div>
+      <div class="burnin-metric"><div class="burnin-metric-label">Response</div><div class="burnin-metric-val" style="font-size:14px;color:${latest.reachable===false?'var(--red)':'var(--text)'}">${rtt}</div></div>
+    </div>
+    ${failsHtml}${warnsHtml}`;
+  return card;
+}
+
+function fmtUptime(s) {
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h>0) return `${h}h ${pad(m)}m`;
+  if(m>0) return `${m}m ${pad(sec)}s`;
+  return `${sec}s`;
+}
+
 </script>
 </body>
 </html>
