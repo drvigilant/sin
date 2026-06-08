@@ -48,6 +48,8 @@ FINDING_WEIGHTS = {
     # CCTV/camera specific (base 45-65)
     "Privacy Leak (RTSP)":         48,
     "RTSP No Authentication":      62,
+    "Unauthenticated RTSP Stream": 62,   # rtsp_probe.probe()
+    "RTSP Default Credentials":    65,   # rtsp_probe.probe_with_creds()
     "Unencrypted Management HTTP": 30,
     # Credential findings (bonus only — these UPGRADE severity)
     "DEFAULT_CREDS_FOUND":         20,   # adds to base, never standalone CRITICAL
@@ -136,6 +138,13 @@ REMEDIATION_DB: Dict[str, List[str]] = {
         "Update RouterOS to the latest stable release.",
         "Disable the default 'admin' account and create a named administrator account.",
         "Enable two-factor authentication if supported by the firmware version.",
+    ],
+    "RTSP Default Credentials": [
+        "Change RTSP stream credentials in camera settings immediately.",
+        "Use a strong unique password — avoid vendor defaults (admin/12345, admin/admin).",
+        "Enable RTSP Digest authentication (more secure than Basic).",
+        "Restrict RTSP port access to authorised network segments via firewall.",
+        "Rotate credentials on all cameras of the same vendor — default credentials are often fleet-wide.",
     ],
     "DEFAULT_CREDS_FOUND": [
         "Change default credentials immediately — device is fully compromised if this is internet-facing.",
@@ -479,8 +488,8 @@ class AuditEngine:
             })
 
         # RTSP — privacy exposure
-        if 554 in ports or 8554 in ports:
-            p = 554 if 554 in ports else 8554
+        if 554 in ports or 8554 in ports or 10554 in ports:
+            p = next(port for port in [554, 8554, 10554] if port in ports)
             vulnerabilities.append({
                 "severity": "MEDIUM",
                 "type": "Privacy Leak (RTSP)",
@@ -537,14 +546,21 @@ class AuditEngine:
 
         # ── LAYER 3: Active probing ───────────────────────────────────────────
 
-        # RTSP authentication probe
-        if 554 in ports or 8554 in ports:
+        # RTSP probes — unauthenticated access + default credential testing
+        if 554 in ports or 8554 in ports or 10554 in ports:
             try:
                 from sin.scanner.rtsp_probe import rtsp_probe
-                rtsp_finding = rtsp_probe.probe(ip, 554 if 554 in ports else 8554, vendor=mfr)
+                _rtsp_port = next(p for p in [554, 8554, 10554] if p in ports)
+                # Probe 1: unauthenticated stream access (CRITICAL)
+                rtsp_finding = rtsp_probe.probe(ip, _rtsp_port, vendor=mfr)
                 if rtsp_finding:
                     rtsp_finding.setdefault("epss", 0.0)
                     vulnerabilities.append(rtsp_finding)
+                # Probe 2: default credentials on auth-protected streams (HIGH)
+                rtsp_cred_finding = rtsp_probe.probe_with_creds(ip, _rtsp_port, vendor=mfr)
+                if rtsp_cred_finding:
+                    rtsp_cred_finding.setdefault("epss", 0.0)
+                    vulnerabilities.append(rtsp_cred_finding)
             except Exception:
                 pass
 
