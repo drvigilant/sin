@@ -569,6 +569,56 @@ Return ONLY a valid JSON array. No markdown fences, no explanation:
         logger.error(f"Groq audit failed: {ex}")
         return {"error": str(ex), "findings": [], "model": "groq"}
 
+@app.post("/ai/investigate")
+async def ai_investigate(request: OllamaAuditRequest):
+    """
+    Agentic multi-step security investigation.
+    Round 1: AI plans which tools to run.
+    Round 2: Python executes tools against the live device.
+    Round 3: AI synthesizes an attack narrative and advisory.
+    """
+    from sin.agent.ai_investigator import AIInvestigator
+
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    if not GROQ_API_KEY:
+        return {"error": "GROQ_API_KEY not configured.", "advisory": None}
+
+    db = SessionLocal()
+    try:
+        device = db.query(models.DeviceLog).filter(
+            models.DeviceLog.ip_address == request.ip_address
+        ).order_by(models.DeviceLog.id.desc()).first()
+
+        device_data = {
+            "ip_address":   request.ip_address,
+            "open_ports":   getattr(device, "open_ports",   request.open_ports) or request.open_ports,
+            "manufacturer": getattr(device, "vendor",       None) or "",
+            "vendor":       getattr(device, "vendor",       None) or "",
+            "model":        getattr(device, "model",        None) or "",
+            "firmware":     getattr(device, "firmware",     None) or "",
+            "mac_address":  getattr(device, "mac_address",  None) or "",
+            "device_type":  getattr(device, "device_type",  None) or "",
+            "vulnerabilities": getattr(device, "vulnerabilities", request.vulnerabilities) or [],
+        }
+    except Exception:
+        device_data = {
+            "ip_address":      request.ip_address,
+            "open_ports":      request.open_ports,
+            "manufacturer":    "",
+            "vendor":          "",
+            "model":           "",
+            "firmware":        "",
+            "mac_address":     "",
+            "device_type":     "",
+            "vulnerabilities": request.vulnerabilities or [],
+        }
+    finally:
+        db.close()
+
+    investigator = AIInvestigator(api_key=GROQ_API_KEY)
+    return await investigator.investigate(device_data)
+
+
 @app.get("/ai/status")
 async def ollama_status():
     try:
