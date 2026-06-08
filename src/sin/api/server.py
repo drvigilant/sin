@@ -569,6 +569,29 @@ Return ONLY a valid JSON array. No markdown fences, no explanation:
         logger.error(f"Groq audit failed: {ex}")
         return {"error": str(ex), "findings": [], "model": "groq"}
 
+# ── Binary analysis endpoint ──────────────────────────────────────────────────
+
+@app.post("/firmware/binary-analyze/{slug}")
+async def binary_analyze(slug: str):
+    """
+    Run static binary analysis on an already-extracted firmware image.
+    Analyzes all ELF binaries found in the extraction directory using
+    readelf and strings — no Ghidra or EMBA required.
+    """
+    from sin.firmware.binary_analyzer import binary_analyzer
+    extract_base = "/var/lib/sin/firmware"
+    extract_path = os.path.join(extract_base, slug)
+    if not os.path.isdir(extract_path):
+        raise HTTPException(status_code=404, detail=f"Extracted firmware not found: {slug}")
+    analyses  = binary_analyzer.analyze_directory(extract_path)
+    summary   = binary_analyzer.summarize(analyses)
+    return {
+        "slug":    slug,
+        "summary": summary,
+        "detail":  [a.to_dict() for a in analyses],
+    }
+
+
 # ── Burn-in telemetry endpoints ───────────────────────────────────────────────
 
 @app.post("/hardware/burnin")
