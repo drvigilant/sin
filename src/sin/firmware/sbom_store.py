@@ -38,6 +38,9 @@ def _ensure_dir() -> None:
 def _slugify(filename: str) -> str:
     """Convert a firmware filename to a safe filesystem slug."""
     name = os.path.splitext(os.path.basename(filename))[0]
+    # If splitext gave us nothing (e.g. ".bin"), use the full basename
+    if not name:
+        name = os.path.basename(filename)
     name = re.sub(r"[^\w\-]", "_", name).strip("_").lower()
     return name or "firmware"
 

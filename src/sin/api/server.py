@@ -621,6 +621,7 @@ async def ws_events(websocket: WebSocket):
     await ws_manager.connect(websocket)
 
 # ── Firmware Analysis Endpoints ──────────────────────────────────────────────
+from fastapi import UploadFile, File
 from sin.firmware.extractor import FirmwareExtractor
 from sin.firmware.secret_extractor import SecretExtractor
 from sin.firmware.sbom_generator import SBOMGenerator
@@ -629,11 +630,6 @@ from sin.firmware.sbom_store import sbom_store
 _FIRMWARE_UPLOAD_DIR = "/var/lib/sin/firmware/uploads"
 os.makedirs(_FIRMWARE_UPLOAD_DIR, exist_ok=True)
 
-assert old in content, "import block not found"
-content = content.replace(old, new, 1)
-with open(path, "w") as f:
-    f.write(content)
-print("import ok")
 # ── Network Analyzer Endpoints ──────────────────────────────────────────────
 @app.get("/analyzer/flows")
 def get_traffic_flows(limit: int = 100):
@@ -844,11 +840,6 @@ async def firmware_results(filename: str):
         files.extend(fs)
     return {"filename": filename, "file_count": len(files), "path": path}
 
-assert old in content, "Pattern not found"
-content = content.replace(old, new, 1)
-with open(path, "w") as f:
-    f.write(content)
-print("done")
 
 # ── AUTH ENDPOINTS ────────────────────────────────────────────────────────────
 from pydantic import BaseModel as _BM

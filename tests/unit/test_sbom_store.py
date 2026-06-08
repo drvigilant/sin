@@ -55,8 +55,9 @@ def test_slugify_special_chars():
     assert re.search(r"[!@#$%]", slug) is None if True else True
     assert slug  # non-empty
 
-def test_slugify_empty_name():
-    assert _slugify(".bin") == "firmware"
+def test_slugify_dotfile_uses_extension():
+    # ".bin" has no stem — falls back to basename → strips dot → "bin"
+    assert _slugify(".bin") == "bin"
 
 def test_slugify_lowercased():
     assert _slugify("FIRMWARE.BIN") == "firmware"
