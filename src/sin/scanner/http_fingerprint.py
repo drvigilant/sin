@@ -433,7 +433,23 @@ def fingerprint(ip: str, open_ports: list) -> Dict:
             # Check page title for model hints
             title_m = re.search(r'<title>([^<]+)</title>', body, re.I)
             if title_m:
-                result.setdefault("_page_title", title_m.group(1).strip())
+                raw_title = title_m.group(1).strip()
+                result.setdefault("_page_title", raw_title)
+                # Parse "BRAND MODEL | DEVICE_TYPE" format (Xiongmai/Securus/XMeye)
+                # e.g. "SECURUS CRIMSON | IPC" -> model=CRIMSON, device_type=IP Camera
+                if "|" in raw_title and not result.get("model"):
+                    parts = [p.strip() for p in raw_title.split("|")]
+                    left  = parts[0].strip()
+                    right = parts[1].strip() if len(parts) > 1 else ""
+                    left_words = left.split()
+                    if len(left_words) >= 2:
+                        result["model"] = " ".join(left_words[1:])
+                    elif len(left_words) == 1:
+                        result["model"] = left_words[0]
+                    if right.upper() in ("IPC", "IP CAMERA"):
+                        result.setdefault("device_type", "IP Camera")
+                    elif right.upper() in ("DVR", "NVR", "DVR/NVR"):
+                        result.setdefault("device_type", "DVR/NVR")
 
             # Stop probing paths once we have enough
             if result.get("vendor") and result.get("firmware"):

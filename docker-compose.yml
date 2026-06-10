@@ -16,9 +16,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - sin_internal
-      - sin_scan
+
     deploy:
      resources:
        limits:
@@ -51,27 +49,26 @@ services:
   api:
     build: .
     container_name: sin_api
+    network_mode: host
     cap_add:
       - NET_RAW
       - NET_ADMIN
     command: >
       sh -c "python -c 'from sin.storage.init_db import init_db; init_db()' &&
              uvicorn sin.api.server:app --host 0.0.0.0 --port 8000"
-    ports:
-      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     environment:
-      - SIN_DB_HOST=db
-      - SIN_DB_PORT=5432
+      - SIN_DB_HOST=localhost
+      - SIN_DB_PORT=5433
       - SIN_DB_USER=${POSTGRES_USER}
       - SIN_DB_PASSWORD=${POSTGRES_PASSWORD}
       - SIN_DB_NAME=${POSTGRES_DB}
-      - SIN_REDIS_HOST=redis
-      - SIN_REDIS_PORT=6379
+      - SIN_REDIS_HOST=localhost
+      - SIN_REDIS_PORT=6380
       - SIN_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SIN_API_KEY=${SIN_API_KEY}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
@@ -82,9 +79,6 @@ services:
       - SIN_ADMIN_USER=${SIN_ADMIN_USER:-admin}
       - SIN_ADMIN_PASS=${SIN_ADMIN_PASS:-sinisboom}
     restart: unless-stopped
-    networks:
-      - sin_internal
-      - sin_scan
     volumes:
       - /var/lib/sin:/var/lib/sin
       - ./src:/app/src
