@@ -233,8 +233,10 @@ def _compute_risk(findings: List[Dict], creds_confirmed: bool) -> Tuple[int, str
         for f in findings
     )
 
-    if score >= 75 and has_rce and creds_confirmed:
-        level = "CRITICAL"
+    if score >= 90 and has_rce:
+        level = "CRITICAL"  # score 90+ with RCE = CRITICAL regardless of cred confirmation
+    elif score >= 75 and has_rce and creds_confirmed:
+        level = "CRITICAL"  # score 75+ with RCE + confirmed creds
     elif score >= 50 and has_rce:
         level = "HIGH"
     elif score >= 50:

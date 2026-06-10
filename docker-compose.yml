@@ -150,18 +150,14 @@ services:
   
   dashboard:
     image: nginx:alpine
+    network_mode: host
     container_name: sin_dashboard
-    ports:
-      - "8501:80"
     volumes:
       - ./src/sin/ui/dist:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - api
     restart: unless-stopped
-    networks:
-      - sin_internal
-      - sin_scan
 volumes:
   postgres_data:
   redis_data:
