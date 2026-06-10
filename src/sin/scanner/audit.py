@@ -224,7 +224,8 @@ def _compute_risk(findings: List[Dict], creds_confirmed: bool) -> Tuple[int, str
     # This prevents port-open-alone (no active exploitation proof) from reaching CRITICAL.
     # RCE present but creds unknown → HIGH (still serious, not confirmed full compromise).
     rce_types = {"Remote Code Execution", "Backdoor Access", "Exposed Database",
-                 "Industrial Control Exposure", "Windows SMB Exposure"}
+                 "Industrial Control Exposure", "Windows SMB Exposure",
+                 "Unauthenticated RTSP Stream", "RTSP Default Credentials"}
     rce_cves  = {"CVE-2018-10088", "CVE-2017-7921", "CVE-2021-36260",
                  "CVE-2021-33044", "CVE-2022-30525", "CVE-2023-28771"}
     has_rce   = any(
@@ -561,6 +562,7 @@ class AuditEngine:
                 if rtsp_cred_finding:
                     rtsp_cred_finding.setdefault("epss", 0.0)
                     vulnerabilities.append(rtsp_cred_finding)
+                    creds_confirmed = True  # confirmed default creds on RTSP stream
             except Exception:
                 pass
 
