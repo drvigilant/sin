@@ -1095,16 +1095,6 @@ def create_user(username: str, password: str, role: str = "analyst", db: Session
     return {"id": user.id, "username": user.username, "role": user.role}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DVRIP / Device Credential endpoints
-# Add these to server.py after the existing /ai/investigate endpoint
-# Also add to imports at top of server.py:
-#   from sin.scanner.dvrip_probe import dvrip_probe
-#   from sin.storage.credential_vault import vault
-# ─────────────────────────────────────────────────────────────────────────────
-
-from pydantic import BaseModel
-from typing import Optional
-
 class CredentialRequest(BaseModel):
     ip: str
     username: str

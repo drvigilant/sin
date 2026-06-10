@@ -15,7 +15,7 @@ import types
 # We inject a lightweight stub so unit tests can import freely.
 if "sin.storage.database" not in sys.modules:
     _db = types.ModuleType("sin.storage.database")
-    _db.Base         = type("Base",         (), {})()
+    _db.Base         = type("Base",         (), {})
     _db.SessionLocal = type("SessionLocal", (), {})()
     _db.engine       = type("engine",       (), {})()
     _db.get_db       = lambda: iter([None])
