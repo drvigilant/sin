@@ -218,6 +218,31 @@ All 14 EMPTY_PASS hosts share MAC OUI `d4:61:37` — Xiongmai Technology confirm
 
 The 5 AUTH_REQUIRED hosts did not yield a MAC address — likely a different firmware revision or a non-Xiongmai device sharing the port. They remain unconfirmed but are not hardened; they simply rejected the two tested credential pairs.
 
+### 8.2b NVR/HVR Deep Analysis — Authenticated Session Results
+
+Two of the three NVR units were successfully accessed via SIN's DVRIP probe using vault credentials (`admin/Aaaa1111`). The third (`.147`) remained locked from earlier probing.
+
+| Field | 192.168.30.86 | 192.168.30.89 |
+|-------|--------------|--------------|
+| Device Type | **HVR** (Hybrid Video Recorder) | **HVR** (Hybrid Video Recorder) |
+| Recording Channels | **32** | **16** |
+| MAC | d4:61:37:62:26:53 | d4:61:37:62:fd:ea |
+| DDNS Key | `securusddns.com` | `securusddns.com` |
+| DDNS Hostname | `kmhouse1.securusddns.com` | `kmhouse1.securusddns.com` |
+| SSL Port | 8443 | 8443 |
+| Max TCP Connections | 10 | 10 |
+| RSA Key | 1024-bit (weak) | 1024-bit (weak) |
+
+**Total recording capacity: 48 channels across 2 HVRs.**
+
+**Critical observations:**
+
+Both HVRs share an identical DDNS hostname `kmhouse1.securusddns.com` — a proprietary Securus DDNS service. Even with DDNS currently disabled, the hostname is pre-configured and points to a Securus-operated relay service. If DDNS is ever re-enabled (remotely, via the unauthenticated management port on the IPC fleet), both HVRs become internet-reachable at a known, predictable hostname with no firewall traversal required.
+
+The `.89` HVR shows non-default video parameters (Brightness=14, Contrast=89, Saturation=9) confirming this unit is actively in use with a tuned camera feed. The `.86` unit has factory-default video parameters suggesting recent deployment or reset.
+
+Both HVRs expose 1024-bit RSA keys pre-authentication — identical weakness to the IPC fleet.
+
 ### 8.3 New Finding — RSA Public Key Exposed Without Authentication
 
 | Field | Value |

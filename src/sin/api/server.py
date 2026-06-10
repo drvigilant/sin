@@ -21,6 +21,8 @@ from sin.agent.runner import AgentRunner
 from sin.agent.packet import PacketSniffer
 from sin.storage.database import SessionLocal
 from sin.storage import models
+from sin.scanner.dvrip_probe import dvrip_probe
+from sin.storage.credential_vault import vault
 
 import datetime as _dt
 
@@ -1091,3 +1093,152 @@ def create_user(username: str, password: str, role: str = "analyst", db: Session
     user = _m.User(username=username, hashed_password=hash_password(password), role=role)
     db.add(user); db.commit(); db.refresh(user)
     return {"id": user.id, "username": user.username, "role": user.role}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DVRIP / Device Credential endpoints
+# Add these to server.py after the existing /ai/investigate endpoint
+# Also add to imports at top of server.py:
+#   from sin.scanner.dvrip_probe import dvrip_probe
+#   from sin.storage.credential_vault import vault
+# ─────────────────────────────────────────────────────────────────────────────
+
+from pydantic import BaseModel
+from typing import Optional
+
+class CredentialRequest(BaseModel):
+    ip: str
+    username: str
+    password: str
+    protocol: str = "dvrip"
+    vendor: Optional[str] = "xiongmai"
+    priority: int = 10          # higher than defaults (0) so vault creds tried first
+
+class DVRIPProbeRequest(BaseModel):
+    ip: str
+    deep: bool = False          # if True, pull full config skeleton after auth
+
+
+@app.post("/credentials")
+async def store_credential(request: CredentialRequest):
+    """
+    Store a device credential in the encrypted vault.
+    Used when a device password is known (e.g. NVR with custom password).
+    """
+    result = vault.add(
+        ip=request.ip,
+        vendor=request.vendor,
+        username=request.username,
+        password=request.password,
+        protocol=request.protocol,
+        priority=request.priority,
+    )
+    return {"status": "stored", "credential": result}
+
+
+@app.get("/credentials")
+async def list_credentials():
+    """List all stored credentials (passwords redacted)."""
+    from sin.storage.database import SessionLocal
+    from sin.storage.credential_vault import DeviceCredential
+    db = SessionLocal()
+    try:
+        creds = db.query(DeviceCredential).all()
+        return [{
+            "id": c.id,
+            "ip_address": c.ip_address,
+            "vendor": c.vendor,
+            "username": c.username,
+            "protocol": c.protocol,
+            "priority": c.priority,
+            "last_success": str(c.last_success) if c.last_success else None,
+            "created_at": str(c.created_at) if c.created_at else None,
+        } for c in creds]
+    finally:
+        db.close()
+
+
+@app.delete("/credentials/{credential_id}", dependencies=[Depends(require_admin)])
+async def delete_credential(credential_id: int):
+    """Delete a stored credential."""
+    vault.delete(credential_id)
+    return {"status": "deleted", "id": credential_id}
+
+
+@app.post("/dvrip/probe")
+async def probe_dvrip(request: DVRIPProbeRequest):
+    """
+    Probe a single device on TCP 34567 (Xiongmai DVRIP protocol).
+
+    - Tries vault credentials first (by priority), then factory defaults
+    - If deep=True and auth succeeds: pulls full config skeleton, network
+      settings, DDNS config, RSA key, connected channel topology
+    - Lockout-safe: stops after Ret=206, never exceeds MAX_DEFAULT_ATTEMPTS
+    """
+    vault_creds = vault.get_for_device(request.ip)
+
+    result = await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: dvrip_probe.probe(
+            ip=request.ip,
+            vault_creds=vault_creds,
+            deep=request.deep,
+        )
+    )
+
+    # Mark vault credential success if auth worked via vault
+    if result.authenticated and result.auth.credential_id:
+        vault.mark_success(result.auth.credential_id, request.ip)
+
+    return result.to_dict()
+
+
+@app.post("/dvrip/fleet-probe")
+async def probe_dvrip_fleet(background_tasks: BackgroundTasks, subnet: str = "192.168.30.0/24", deep: bool = False):
+    """
+    Probe all hosts in a subnet for TCP 34567 exposure.
+    Runs in background — poll /dvrip/fleet-status for results.
+    """
+    import ipaddress, asyncio
+    from sin.storage.credential_vault import vault as _vault
+
+    async def _run_fleet():
+        network = ipaddress.ip_network(subnet, strict=False)
+        results = []
+        for host in network.hosts():
+            ip = str(host)
+            vcreds = _vault.get_for_device(ip)
+            r = dvrip_probe.probe(ip=ip, vault_creds=vcreds, deep=deep)
+            if r.port_open:
+                results.append(r.to_dict())
+        # Cache results in Redis
+        import redis, json as _json
+        try:
+            rc = redis.Redis(host="redis", port=6379, db=0, decode_responses=True)
+            rc.setex("dvrip:fleet:last_results", 3600, _json.dumps(results))
+            rc.set("dvrip:fleet:status", "complete")
+        except Exception:
+            pass
+
+    background_tasks.add_task(_run_fleet)
+    return {"status": "started", "subnet": subnet, "deep": deep}
+
+
+@app.get("/dvrip/fleet-status")
+async def fleet_probe_status():
+    """Get results of last fleet DVRIP probe."""
+    import redis, json as _json
+    try:
+        rc = redis.Redis(host="redis", port=6379, db=0, decode_responses=True)
+        status = rc.get("dvrip:fleet:status") or "no_scan"
+        raw = rc.get("dvrip:fleet:last_results")
+        results = _json.loads(raw) if raw else []
+        return {
+            "status": status,
+            "total": len(results),
+            "open": sum(1 for r in results if r["port_open"]),
+            "authenticated": sum(1 for r in results if r["authenticated"]),
+            "critical": sum(1 for r in results if r.get("severity") == "critical"),
+            "results": results,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
