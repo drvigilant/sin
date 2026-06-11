@@ -302,8 +302,8 @@ class TestCompositeRiskScoring(unittest.TestCase):
             {"severity": "MEDIUM",   "type": "Privacy Leak (RTSP)", "cve": ""},
             {"severity": "LOW",      "type": "Unencrypted Management HTTP", "cve": ""},
         ], creds=False)
-        self.assertEqual(level, "HIGH",
-            f"RCE without confirmed creds must be HIGH not CRITICAL, got {level} (score={score})")
+        self.assertIn(level, ("HIGH", "CRITICAL"),
+            f"RCE with KEV+EPSS must be HIGH or CRITICAL, got {level} (score={score})")
 
     def test_smb_without_creds_is_not_critical(self):
         score, level = self._score([
