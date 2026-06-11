@@ -215,7 +215,9 @@ class AgentRunner:
 
         # ── AuditEngine: evidence-based findings + calibrated score ───────────
         vulns, audit_score, _audit_action = self.auditor.evaluate_asset(asset)
-        asset["vulnerabilities"] = vulns
+        # Merge: preserve any pre-audit findings (e.g. DVRIP probe from Stage 0c)
+        pre_audit_vulns = [v for v in asset.get("vulnerabilities", []) if v.get("engine") != "audit" and v.get("type") not in {v2.get("type") for v2 in vulns}]
+        asset["vulnerabilities"] = vulns + pre_audit_vulns
         asset = normalize_host(asset)
 
         vendor = asset.get("manufacturer") or asset.get("vendor") or "Unknown"
