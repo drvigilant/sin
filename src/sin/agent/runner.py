@@ -171,6 +171,48 @@ class AgentRunner:
         except Exception as exc:
             logger.debug(f"[runner] SNMP probe failed {ip}: {exc}")
 
+        # ── Stage 0c: DVRIP probe (TCP 34567 — Xiongmai binary protocol) ───────
+        # Probes for unauthenticated management access on the Xiongmai SDK port.
+        # Vault credentials are tried first (priority order), then factory defaults.
+        # Lockout-safe: stops after Ret=206, never exceeds MAX_DEFAULT_ATTEMPTS.
+        if 34567 in set(asset.get("open_ports", [])) or asset.get("device_type") in ("camera", "nvr_dvr"):
+            try:
+                from sin.scanner.dvrip_probe import dvrip_probe
+                from sin.storage.credential_vault import vault
+                vault_creds = vault.get_for_device(ip)
+                dvrip_result = dvrip_probe.probe(ip=ip, vault_creds=vault_creds, deep=False)
+                if dvrip_result.port_open:
+                    asset.setdefault("open_ports", [])
+                    if 34567 not in asset["open_ports"]:
+                        asset["open_ports"].append(34567)
+                    if dvrip_result.authenticated:
+                        auth = dvrip_result.auth
+                        cred_desc = f"admin/{'(empty)' if not auth.password else 'default'}"
+                        severity = "CRITICAL" if not auth.password else "HIGH"
+                        asset.setdefault("vulnerabilities", []).append({
+                            "type":        "DVRIP_UNAUTH_ACCESS",
+                            "severity":    severity,
+                            "cve":         "",
+                            "port":        34567,
+                            "description": (
+                                f"Xiongmai binary RPC (TCP 34567) accepts {cred_desc} — "
+                                f"full device management accessible without authentication. "
+                                f"DeviceType={auth.device_type} Channels={auth.channel_num}"
+                            ),
+                            "remediation": [
+                                "Set a strong password on the device management interface",
+                                "Block TCP 34567 at the perimeter firewall",
+                                "Update firmware to latest available version",
+                            ],
+                        })
+                        if auth.credential_id:
+                            vault.mark_success(auth.credential_id, ip)
+                    elif dvrip_result.locked:
+                        pass
+            except Exception as exc:
+                import logging
+                logging.getLogger("sin.agent.runner").debug(f"[runner] DVRIP probe failed {ip}: {exc}")
+
         # ── AuditEngine: evidence-based findings + calibrated score ───────────
         vulns, audit_score, _audit_action = self.auditor.evaluate_asset(asset)
         asset["vulnerabilities"] = vulns
