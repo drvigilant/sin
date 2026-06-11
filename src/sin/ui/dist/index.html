@@ -534,6 +534,9 @@ tbody .sev-INFO { color: var(--text3); }
         <i class="fas fa-robot"></i><span>AI Investigator</span>
       </div>
       <div class="nav-section">Hardware</div>
+      <div class="nav-item" data-page="credentials">
+        <i class="fa fa-key"></i><span>Credentials</span>
+      </div>
       <div class="nav-item" data-page="burnin">
         <i class="fas fa-thermometer-half"></i><span>Burn-in Lab</span>
       </div>
@@ -874,6 +877,63 @@ tbody .sev-INFO { color: var(--text3); }
     </div>
 
     <!-- BURN-IN LAB -->
+    <div class="page" id="page-credentials" style="flex-direction:column;overflow-y:auto;">
+      <div style="padding:24px;max-width:900px;width:100%;">
+        <div style="margin-bottom:20px;">
+          <div style="font-size:18px;font-weight:600;color:var(--text)">Device Credentials</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">Store per-device passwords for authenticated deep analysis on TCP 34567</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:24px;">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.08em;">Add Credential</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
+            <div><label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px;">IP Address</label>
+              <input id="cred-ip" type="text" placeholder="192.168.30.86" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;color:var(--text);font-size:12px;box-sizing:border-box;"></div>
+            <div><label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px;">Username</label>
+              <input id="cred-user" type="text" value="admin" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;color:var(--text);font-size:12px;box-sizing:border-box;"></div>
+            <div><label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px;">Password</label>
+              <input id="cred-pass" type="password" placeholder="leave empty for blank" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;color:var(--text);font-size:12px;box-sizing:border-box;"></div>
+            <div><label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px;">Protocol</label>
+              <select id="cred-proto" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;color:var(--text);font-size:12px;box-sizing:border-box;">
+                <option value="dvrip">DVRIP (34567)</option>
+                <option value="rtsp">RTSP (554)</option>
+                <option value="onvif">ONVIF (80)</option>
+              </select></div>
+            <button onclick="addCredential()" style="background:var(--accent);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:12px;cursor:pointer;white-space:nowrap;">+ Add</button>
+          </div>
+          <div id="cred-msg" style="margin-top:10px;font-size:11px;display:none;"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:24px;">
+          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.08em;">Deep Device Probe</div>
+          <div style="display:flex;gap:10px;align-items:end;">
+            <div style="flex:1;"><label style="font-size:10px;color:var(--text3);display:block;margin-bottom:4px;">Target IP</label>
+              <input id="probe-ip" type="text" placeholder="192.168.30.86" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:7px 10px;color:var(--text);font-size:12px;box-sizing:border-box;"></div>
+            <button onclick="runDeepProbe()" style="background:var(--accent);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:12px;cursor:pointer;">Run Deep Probe</button>
+          </div>
+          <div id="probe-result" style="margin-top:14px;display:none;background:var(--surface2);border-radius:6px;padding:14px;font-size:11px;font-family:var(--font-data);color:var(--text2);white-space:pre-wrap;max-height:400px;overflow-y:auto;"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:0.08em;">Stored Credentials</div>
+            <button onclick="loadCredentials()" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:5px 12px;font-size:11px;color:var(--text2);cursor:pointer;">↻ Refresh</button>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead><tr style="border-bottom:1px solid var(--border);">
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">ID</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">IP</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">Username</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">Protocol</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">Priority</th>
+              <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500;">Last Success</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="cred-table-body">
+              <tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text3);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-burnin">
       <div class="burnin-layout">
         <div class="pane-header">
@@ -2090,6 +2150,103 @@ function renderBurninCard(rep) {
     ${failsHtml}${warnsHtml}`;
   return card;
 }
+
+// ── Credentials panel ─────────────────────────────────────────────────────
+async function loadCredentials() {
+  const tbody = document.getElementById('cred-table-body');
+  try {
+    const r = await apiFetch('/credentials');
+    const creds = await r.json();
+    if (!creds.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text3);">No credentials stored</td></tr>';
+      return;
+    }
+    tbody.innerHTML = creds.map(c => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:6px 8px;color:var(--text3);">#${c.id}</td>
+        <td style="padding:6px 8px;font-family:var(--font-data);color:var(--accent);">${esc(c.ip_address||'(any)')}</td>
+        <td style="padding:6px 8px;font-family:var(--font-data);">${esc(c.username)}</td>
+        <td style="padding:6px 8px;"><span style="background:var(--surface2);padding:2px 6px;border-radius:3px;font-size:10px;">${esc(c.protocol)}</span></td>
+        <td style="padding:6px 8px;color:var(--text3);">${c.priority}</td>
+        <td style="padding:6px 8px;color:var(--text3);font-size:10px;">${c.last_success ? c.last_success.substring(0,16) : '—'}</td>
+        <td style="padding:6px 8px;"><button onclick="deleteCredential(${c.id})" style="background:var(--red-dim,#2a1a1a);color:var(--red);border:1px solid var(--red);border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;">Delete</button></td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--red);">Error: ${esc(String(e))}</td></tr>`;
+  }
+}
+
+async function addCredential() {
+  const ip   = document.getElementById('cred-ip').value.trim();
+  const user = document.getElementById('cred-user').value.trim();
+  const pass = document.getElementById('cred-pass').value;
+  const proto= document.getElementById('cred-proto').value;
+  const msg  = document.getElementById('cred-msg');
+
+  if (!ip) { showCredMsg('IP address is required', 'var(--red)'); return; }
+
+  try {
+    const r = await apiFetch('/credentials', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ip, username:user, password:pass, protocol:proto, priority:10})
+    });
+    const d = await r.json();
+    if (d.status === 'stored') {
+      showCredMsg(`✓ Stored credential #${d.credential.id} for ${ip}`, 'var(--green)');
+      document.getElementById('cred-ip').value = '';
+      document.getElementById('cred-pass').value = '';
+      loadCredentials();
+    } else {
+      showCredMsg('Error: ' + JSON.stringify(d), 'var(--red)');
+    }
+  } catch(e) {
+    showCredMsg('Error: ' + e, 'var(--red)');
+  }
+}
+
+async function deleteCredential(id) {
+  if (!confirm('Delete credential #' + id + '?')) return;
+  try {
+    await apiFetch('/credentials/' + id, {method: 'DELETE'});
+    loadCredentials();
+  } catch(e) {
+    alert('Delete failed: ' + e);
+  }
+}
+
+async function runDeepProbe() {
+  const ip = document.getElementById('probe-ip').value.trim();
+  const out = document.getElementById('probe-result');
+  if (!ip) { alert('Enter an IP address'); return; }
+  out.style.display = 'block';
+  out.textContent = 'Probing ' + ip + ' on TCP 34567...';
+  try {
+    const r = await apiFetch('/dvrip/probe', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ip, deep: true})
+    });
+    const d = await r.json();
+    out.textContent = JSON.stringify(d, null, 2);
+    // Colour based on severity
+    const colours = {critical:'var(--red)', high:'var(--amber)', medium:'var(--text2)', low:'var(--text3)', none:'var(--text3)'};
+    out.style.borderLeft = '3px solid ' + (colours[d.severity] || 'var(--border)');
+  } catch(e) {
+    out.textContent = 'Error: ' + e;
+  }
+}
+
+function showCredMsg(text, color) {
+  const el = document.getElementById('cred-msg');
+  el.textContent = text;
+  el.style.color = color;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// Auto-load credentials when page is shown
+const _origShowPage = typeof showPage === 'function' ? showPage : null;
 
 function fmtUptime(s) {
   const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
